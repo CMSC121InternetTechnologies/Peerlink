@@ -1,8 +1,85 @@
-# 🔗 PeerLink
-to start coding on the project clone the repository then navigatr to:
+# Developer Guide
+to start coding on the project clone the repository then navigate to:
+
+## Prerequisites: 
+* php
+* laravel 
+* composer
+
+
+Please intsall the following on your machine before proceeding. 
+
+## Something to note 
+* when running the terminal in VS code please avoid using Powershell 
+
+## Start Coding
+to start coding on the project clone the repository then navigate to:
+
  ```bash
    .../Peerlink/peerlink
    ```
+## Start the Local Developmnent Server
+To boot up Laravel's built-in server enter the following command. Please use this instead of XMAPP or other development tool
+
+```bash
+    php artisan serve
+```
+
+## Opening you application locally
+Since we are using @vite, we need Node.js to bundle those assets. We must run a second background process alongside your php artisan serve command. 
+
+Open a new separate terminal (DO NOT CLOSE THE TERMINAL WHERE **php artisan serve** WAS RUNNING) and navigate to the application folder. Run the following commands: 
+
+```bash
+# Step 1: Install the frontend dependencies (you only do this once)
+npm install
+
+# Step 2: Start the Vite server (you do this every time you code)
+npm run dev
+```
+
+When you run **npm run dev**, your terminal will show a message indicating that Vite is running (usually on port 5173).
+
+The terminal will usually indicate on what port your server is running. Click the link or copy past the address to your browser. 
+
+## Coding in Laravel 
+The standard workflow for adding features or pages in this app are as follows:
+
+**1 Define the Route** 
+navigate to 
+```bash 
+    routes/web.php
+```
+to tell Laravel what URL the user is allowed to visit
+
+**2 Create the Controller** 
+This is where the PHP logic will reside. To create a new controller using artisan: 
+```bash
+    php artisan make:controller [Controller-Name.php]
+```
+then navigate to 
+```bash
+    app/Http/Controllers/[Controller-Name.php]
+```
+Open it then write the method that you have references in your route. 
+
+**3. Create the Model and Migration**
+If your feature needs to save or read data you need a Database Table and a Model to interact with it. Again, use Artisan to generate both at the same time by adding the -m flag:
+```bash
+    php artisan make:model Course -m
+```
+
+**4. Build the View**
+Create the HTML that the user actually sees. Because Laravel uses the "Blade" templating engine, your file must end in .blade.php.
+
+Create your files at the 
+```bash 
+    resources/[css][js][views]
+```
+folder. 
+
+
+# 🔗 PeerLink
 **Democratizing Academic Support Through Peer-to-Peer Tutoring**
 
 PeerLink is a peer-to-peer matching web application designed specifically for college students. It allows students to offer tutoring in subjects they excel at while simultaneously requesting help in subjects they struggle with—all from a single, unified account. Utilizing a secure “request-and-approve” workflow, PeerLink ensures that both parties consent and understand learning objectives before a match is finalized.

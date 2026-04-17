@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PeerLink | Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+
+
+ @vite(['resources/css/style.css', 'resources/js/app.js'])
+</head>
+
+
+<body class="mode-tutee">
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        
+        <!-- Logo -->
+        <a class="logo">
+        <div class="logo-icon"></div>
+        <span class="logo-text">PEER<strong>LINK</strong></span>
+        </a>
+
+        <!-- Navigation Links -->
+        <div class="nav-links">
+            <a href="#" class="nav-link">Dashboard</a>
+            <a href="#" class="nav-link active">Profile</a>
+            <a href="#" class="nav-link">Log out</a>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle" id="modeToggle">
+            
+            <!-- Tutor Mode -->
+            <button class="toggle-btn" id="tutorBtn" onclick="setMode('tutor')">
+    
+            <!-- Icon from Lucide -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg>
+
+            Tutor
+            </button>
+  
+            <!-- Tutee Mode -->
+            <button class="toggle-btn" id="tuteeBtn" onclick="setMode('tutee')">
+
+            <!-- Icon from Lucide -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pen-line-icon lucide-pen-line"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+            
+            Tutee
+            </button>
+        
+        </div>
+    
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="page">
+    
+    <!-- Profile -->
+    <div class="profile-container">
+        <div class="profile-card">
+        
+        <!-- Profile Header -->
+        <div class="profile-header-main">
+        
+            <!-- Avatar -->
+            <div class="tutor-avatar larger">MC</div>
+            <div class="profile-meta">
+
+                <!-- Display Name -->
+                <h1 id="profileDisplayName">Maria Clara</h1>
+
+                <!-- Role Badge -->
+                <div class="role-badge" id="roleBadge"></div>
+        
+            </div>
+        
+            <!-- Edit Profile Button   -->
+            <button class="btn-outline" onclick="toggleEditMode(true)">
+                Edit Profile
+            </button>
+        
+        </div>
+
+    <!-- Profile Details -->
+    <div id="profileViewMode">
+
+        <!-- Bio Section -->
+        <section class="profile-section bio-box">
+            <h3>Bio</h3>
+            <p id="bioDisplay" class="bio-text">No bio added yet.</p>
+        </section>
+
+        <!-- Courses Section -->
+        <div class="profile-grid">
+
+            <!-- Tutor Courses -->
+            <section class="profile-section">
+              <h3>Courses I Can Tutor</h3>
+              <div id="tutorCoursesDisplay" class="tutor-courses"></div>
+            </section>
+
+            <!-- Tutee Courses -->
+            <section class="profile-section">
+              <h3>Courses I Need Help With</h3>
+              <div id="tuteeCoursesDisplay" class="tutor-courses"></div>
+            </section>
+        
+        </div>
+          
+        <!-- Danger Zone -->
+        <div class="danger-zone">
+            <h4>Danger Zone</h4>
+            
+            <p class="danger-text">This action is permanent and cannot be undone.</p>
+
+            <!-- Delete Account Button -->
+            <button class="btn-danger-outline" onclick="openDeleteModal()">
+                Delete Account
+            </button>
+        
+        </div>
+    
+    </div>
+
+    <!-- Edit Profile Form -->
+    <form id="profileEditMode" style="display: none;" onsubmit="saveProfile(event)">
+        <div class="edit-layout">
+        
+        <!-- Bio Input -->
+        <div class="input-group">
+            <label>Bio</label>
+            <div class="bio-textarea-wrapper">
+                <textarea id="bioInput" maxlength="250"></textarea>
+                <div class="char-counter"><span id="charCount">0</span>/250</div>
+            </div>
+        </div>
+            
+        <!-- Courses Input -->
+        <div class="course-edit-grid">
+            
+            <!-- Tutor Courses -->
+            <div class="input-group">
+                <label>Expertise (Tutor)</label>
+                
+                <!-- Select Course -->
+                <select class="select-course" id="tutorSelect" onchange="addCourse('tutor')">
+                <option value="" disabled selected>+ Add Course</option>
+                    <option value="CMSC 11">CMSC 11</option>
+                    <option value="CMSC 21">CMSC 21</option>
+                    <option value="MATH 17">MATH 17</option>
+                </select>
+                <div id="tutorTags" class="edit-tags-container"></div>
+            </div>
+
+            <!-- Tutee Courses -->
+            <div class="input-group">
+                <label>Learning Goals (Tutee)</label>
+
+                <!-- Select Course -->
+                <select class="select-course" id="tuteeSelect" onchange="addCourse('tutee')">
+                    <option value="" disabled selected>+ Add Course</option>
+                    <option value="MATH 55">MATH 55</option>
+                    <option value="PHYS 71">PHYS 71</option>
+                </select>
+                <div id="tuteeTags" class="edit-tags-container"></div>
+            </div>
+            
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-spacer">
+            
+            <!-- Cancel & Save Buttons -->
+            <button type="button" class="btn-outline" onclick="toggleEditMode(false)">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+        
+        </div>
+                
+        </div>       
+    </form>
+    
+    </div>
+
+    </main>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+
+            <!-- Delete Confirmation -->
+            <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+            <h2 class="modal-title-danger">Delete Account</h2>
+
+            <!-- Warning Message -->
+            <p class="modal-warning-text">Confirm with your password to permanently delete your account.</p>
+            <input type="password" id="deleteConfirmPassword" class="modal-input" placeholder="Password" />
+
+            <!-- Confirm Deletion Button -->
+            <button class="btn-danger-block" onclick="confirmAccountDeletion()">Delete Permanently</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    
+</body>
+
+</html>
