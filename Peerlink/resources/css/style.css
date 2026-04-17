@@ -1,0 +1,408 @@
+/* ===== COLOR PALETTE TOKENS ===== */
+:root {
+    --cream: #fdf6e3;
+    --cream-dark: #f5ead0;
+    --teal: #4ab3c3;
+    --teal-dark: #3a96a5;
+    --coral: #e07060;
+    --purple: #7c6fc4;
+    --purple-light:   #ede9ff;
+    --purple-dark: #6358b0;
+    --text: #1e1e2e;
+    --text-muted: #6b6b80;
+    --white: #ffffff;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.08);
+    --font-body: 'DM Sans', sans-serif;
+    --font-display: 'Sora', sans-serif;
+}
+
+/* ===== BASE ===== */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-body);
+    color: var(--text);
+    min-height: 100vh;
+    background: var(--cream);
+}
+
+/* ===== NAVBAR ===== */
+.navbar {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 0 2.5rem;
+    height: 64px;
+    background: var(--white);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* ==== LOGO ==== */
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.logo-icon {
+    width: 32px;
+    height: 32px;
+    background-image: url('media/peerlink_logo.svg');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.logo-text {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--teal);
+}
+
+.logo-text strong {
+    color: var(--coral);
+}
+
+/* ==== NAV LINKS ==== */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.nav-link {
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.4rem 0.75rem;
+}
+
+/* ===== PAGE LAYOUT ===== */
+.page {
+    padding: 2.5rem 2.5rem 4rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.profile-container {
+    max-width: 850px;
+    margin: 0 auto;
+}
+
+/* ===== PROFILE CARD ===== */
+.profile-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 3rem;
+    box-shadow: var(--shadow);
+}
+
+/* ==== PROFILE HEADER ==== */
+.profile-header-main {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--cream-dark);
+}
+
+.tutor-avatar.larger {
+    width: 110px;
+    height: 110px;
+    font-size: 2.8rem;
+    background: linear-gradient(135deg, #b8a7ea, var(--purple));
+    border: 4px solid var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border-radius: 12px;
+    font-family: var(--font-display);
+    font-weight: 700;
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 50px;
+    background: var(--teal-dark);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+/* ===== PROFILE CONTENT ===== */
+
+/* BIO INPUT BOX */
+.bio-box {
+    background: linear-gradient(to right, var(--purple-light), transparent);
+    border-radius: var(--radius);
+    padding: 1.5rem 2rem;
+    border-left: 5px solid var(--purple);
+    margin-bottom: 2.5rem;
+}
+
+.bio-text {
+    font-size: 1rem;
+    line-height: 1.7;
+    font-style: italic;
+    color: var(--text);
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+}
+
+.profile-section h3 {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+}
+
+.course-badge {
+    display: inline-block;
+    background: var(--purple-light);
+    color: var(--purple-dark);
+    padding: 0.3rem 0.8rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin: 0 0.4rem 0.4rem 0;
+}
+
+/* ===== EDIT MODE ===== */
+.edit-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.bio-textarea-wrapper {
+    background: var(--white);
+    border: 2px solid #e0d8c8;
+    border-radius: var(--radius);
+    padding: 10px;
+}
+
+#bioInput {
+    width: 100%;
+    min-height: 120px;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+}
+
+.course-edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.select-course {
+    width: 100%;
+    padding: 0.85rem 2rem 0.85rem 1rem;
+    border: 2px solid #e0d8c8;
+    border-radius: var(--radius-sm);
+    background-color: #f9f9fb;
+    font-family: var(--font-body);
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+/* TAGS */
+.filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--purple);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    margin-top: 1rem;
+}
+
+.filter-tag button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+}
+
+.edit-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* INPUT GROUP */
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+    background: var(--teal);
+    color: white;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-outline {
+    border: 2px solid var(--teal);
+    color: var(--teal-dark);
+    background: transparent;
+    padding: 0.7rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.profile-header-main .btn-outline {
+    margin-left: auto;
+}
+
+/* ===== DANGER ZONE ===== */
+.danger-zone {
+    margin-top: 4rem;
+    padding: 2.5rem;
+    background: #fff8f7;
+    border: 1px dashed #e0706044;
+    border-radius: var(--radius);
+}
+
+.btn-danger-outline {
+    background: transparent;
+    color: var(--coral);
+    border: 2px solid var(--coral);
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1rem;
+}
+
+/* ===== FORM ACTIONS ===== */
+.form-actions-spacer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+/* ===== MODALS & TOAST ===== */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+
+.modal-overlay.open {
+    display: flex;
+}
+
+.modal {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: var(--radius);
+    max-width: 420px;
+    width: 100%;
+}
+
+.toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 50px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.toast.show {
+    opacity: 1;
+}
+
+/* ===== MODE TOGGLE ===== */
+.mode-toggle {
+    display: flex;
+    background: #f0f0f5;
+    border-radius: 50px;
+    padding: 3px;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border: none;
+    border-radius: 50px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-muted);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+/* ACTIVE STATE FOR TUTOR MODE */
+body.mode-tutor #tutorBtn {
+    background: var(--white);
+    color: var(--teal-dark);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* ACTIVE STATE FOR TUTEE MODE */
+body.mode-tutee #tuteeBtn {
+    background: var(--white);
+    color: var(--coral);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* BODY BACKGROUND BASED ON MODE */
+body.mode-tutee {
+    background: var(--cream);
+}
+
+body.mode-tutor {
+    background: #e8f4f7;
+}
