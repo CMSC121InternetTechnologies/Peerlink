@@ -1,5 +1,8 @@
 # 🔗 PeerLink
-
+to start coding on the project clone the repository then navigatr to:
+ ```bash
+   .../Peerlink/peerlink
+   ```
 **Democratizing Academic Support Through Peer-to-Peer Tutoring**
 
 PeerLink is a peer-to-peer matching web application designed specifically for college students. It allows students to offer tutoring in subjects they excel at while simultaneously requesting help in subjects they struggle with—all from a single, unified account. Utilizing a secure “request-and-approve” workflow, PeerLink ensures that both parties consent and understand learning objectives before a match is finalized.
