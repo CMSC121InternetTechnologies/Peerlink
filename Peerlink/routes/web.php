@@ -1,42 +1,20 @@
 <?php
 
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\DashboardController;
 
-/*
-|--------------------------------------------------------------------------
-| Public Routes (No Wrapper Needed)
-|--------------------------------------------------------------------------
-| Anyone can see these pages, whether logged in or out.
-*/
 Route::get('/', function () {
-    return view('index'); // e.g., Your application's landing page
+    return view('welcome');
 });
 
-/*
-|--------------------------------------------------------------------------
-| The "Public Route Wrapper"
-|--------------------------------------------------------------------------
-| Only logged-OUT guests can see these. Logged-in users are redirected.
-*/
-Route::middleware('guest')->group(function () {
-    Route::get('/login', [LoginController::class, 'show'])->name('login');
-    Route::post('/login', [LoginController::class, 'authenticate']);
-    
-    Route::get('/register', [RegisterController::class, 'show'])->name('register');
-    Route::post('/register', [RegisterController::class, 'store']);
-});
+Route::get('/dashboard', function () {
+    return view('dashboard');
+})->middleware(['auth', 'verified'])->name('dashboard');
 
-/*
-|--------------------------------------------------------------------------
-| The "Protected Route Wrapper"
-|--------------------------------------------------------------------------
-| Only logged-IN users can see these. Logged-out users are redirected to /login.
-*/
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    
-    // Core application features go here
-   
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+require __DIR__.'/auth.php';

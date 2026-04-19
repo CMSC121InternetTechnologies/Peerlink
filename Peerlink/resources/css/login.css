@@ -1,0 +1,237 @@
+*{
+    box-sizing: border-box;
+}
+body{
+    background-color: #0d1117;
+    display: flex;            
+    flex-direction: column;  
+    min-height: 100vh;       
+    margin: 0;
+    min-width: 255px; 
+}
+
+#parent-container{
+    display: flex;
+    justify-content: center;
+    row-gap: 16px;
+}
+
+
+
+#login-container{
+    box-sizing: border-box;
+    color: rgb(240, 246, 252);
+    color-scheme: dark;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    font-size: 14px; 
+    font-weight: 400;
+    height: 80%;
+    line-height: 21px;
+    overflow-wrap: break-word;
+    padding: 16px;
+    text-rendering: optimizelegibility;
+    text-size-adjust: 100%;
+    unicode-bidi: isolate;
+    width: 24rem;
+    -webkit-font-smoothing: antialiased; 
+    gap: 20px; 
+    
+}
+
+.git-logo{
+    height: 48px;
+    width: 48px;
+    margin-bottom: 24px;
+    border-radius: 50%; 
+    background-color: white; 
+    display: inline-block;
+    margin: 0;
+}
+
+h1{
+    font-size: 20px;
+    margin: 0; 
+    margin-top: 16px;
+}
+
+ul{
+    display: flex;
+    flex-direction: row;
+    padding-left: 0;
+    list-style: none;
+}
+
+li{
+    padding: 10px;
+    color: #9198a1;
+}
+
+#login-header{
+    display: flexbox;
+    flex-direction: column;
+    text-align: center;
+    
+    
+}
+
+#login-content{
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.spacer{
+    display: flex;
+    align-items: center;
+}
+
+.spacer span{
+    padding: 0px 8px; 
+}
+
+hr{
+    flex-grow: 1;
+    height: 1px;
+    border-color:#3d444d;  
+}
+
+input{
+    width: 100%;
+    padding: 5px 12px;
+    height: 40px;
+    border-radius: 6px;
+    outline: none;
+}
+
+.input-text-field{
+    margin-bottom: 16px;
+    background-color: #0d1117;
+    border: 1px solid #30363d;;
+    font-size: 14px;
+    line-height: 20px;
+    margin: 0;
+    
+}
+
+#sign-in-button{
+    width: 100%;
+    background-color: #238636;
+    color: white;
+    font-weight: 600;
+    border: 1px solid rgba(240, 246, 252, 0.1);
+    border-radius: 6px;
+    padding: 5px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 4px;
+    height: 40px;
+    margin: 0;
+}
+
+.input-text-field:focus {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+}
+.alternative-login-button{
+    display: block;
+}
+
+
+footer{       
+    margin-top: auto;
+    text-align: center;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+#login-footer{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#footer-div{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0%;
+    height: 20%;
+    width: 100vw;
+    background-color: #212830;
+}
+
+button{
+    height: 40px;
+    width: 100%; 
+    background-color: #262c36;
+    border:#3d444d ;
+    border-radius: 6px;
+    font-weight: 600;
+    border-style: solid;
+    border-width: 1px;
+}
+
+.button-content {
+    display: flex;
+    align-items: center;      
+    justify-content: center;   
+    gap: 8px;
+}
+
+.button-content img{
+    height: 16px;
+    width: auto;
+}
+
+
+
+label{
+    font-weight: 600;
+    display: flex; 
+    justify-content: space-between;
+}
+
+a{
+    color: #4493f8; 
+    text-decoration: none;
+}
+
+#passkey-signin{
+    font-weight:600;
+}
+
+.header{
+    padding: 16px;
+    width: 100%;
+}
+
+@media(max-width: 640px){
+    ul{
+        flex-direction: column;
+    }
+    li{
+        padding: 3px; 
+    }
+
+    #footer-div{
+        height: 30%;
+
+    }
+
+    #login-container{
+        height:70%
+    }
+}
+
+
+@media(max-width: 524px){
+    #login-container{
+        width: 100%
+    }
+
+    #parent-container{
+    display:block;
+    }
+}
