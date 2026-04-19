@@ -18,6 +18,46 @@ to start coding on the project clone the repository then navigate to:
  ```bash
    .../Peerlink/peerlink
    ```
+
+## Install Laravel Dependencies 
+This reads the composer.json file and redownloads Laravel, Breeze, and any other PHP packages.
+```bash
+    composer install
+```
+
+## Install Javascript Dependencies
+This reads the package.json file and redownloads Vite, Axios, and any other frontend tools
+```bash
+    npm install
+```
+
+## Recreate the Evironment File 
+For security reasons, the .env file (which holds your database passwords) is never pushed to GitHub. Laravel provides a safe template called .env.example that you must copy and rename to .env.
+**(On Windows Command Prompt, run this:)**
+
+```bash
+copy .env.example .env
+
+```
+
+**(On Mac/Linux/Git Bash, run this:)**
+```bash
+cp .env.example .env
+```
+
+## Generate the Application Key
+Every Laravel app needs a unique cryptographic key for security (which gets stored in your newly created .env file).
+
+```bash
+php artisan key:generate
+```
+
+## Set Up Database 
+Finally, open the .env file, ensure that the  database name is correct, and run the migrations to rebuild the database tables.
+```bash
+    php artisan migrate 
+```
+
 ## Start the Local Developmnent Server
 To boot up Laravel's built-in server enter the following command. Please use this instead of XMAPP or other development tool
 
@@ -31,10 +71,7 @@ Since we are using @vite, we need Node.js to bundle those assets. We must run a 
 Open a new separate terminal (DO NOT CLOSE THE TERMINAL WHERE **php artisan serve** WAS RUNNING) and navigate to the application folder. Run the following commands: 
 
 ```bash
-# Step 1: Install the frontend dependencies (you only do this once)
-npm install
-
-# Step 2: Start the Vite server (you do this every time you code)
+# Start the Vite server (you do this every time you code)
 npm run dev
 ```
 
