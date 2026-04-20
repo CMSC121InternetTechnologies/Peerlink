@@ -27,7 +27,7 @@
         <div class="nav-links">
             <a href="#" class="nav-link">Dashboard</a>
             <a href="#" class="nav-link active">Profile</a>
-            <a href="#" class="nav-link">Log out</a>
+            <a href="{{ route('login') }}" class="nav-link">Log out</a>
         </div>
 
         <!-- Mode Toggle -->
