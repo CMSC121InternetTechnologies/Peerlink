@@ -51,7 +51,7 @@ DROP TABLE IF EXISTS `Courses`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Courses` (
   `course_id` int(11) NOT NULL AUTO_INCREMENT,
-  `division_id` int(11) NOT NULL,
+  `division_id` varchar(10) DEFAULT NULL,
   `course_code` varchar(20) NOT NULL,
   `course_name` tinytext NOT NULL,
   PRIMARY KEY (`course_id`),
@@ -77,10 +77,10 @@ DROP TABLE IF EXISTS `Divisions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Divisions` (
-  `division_id` int(11) NOT NULL AUTO_INCREMENT,
+  `division_id` varchar(10) NOT NULL,
   `division_name` tinytext NOT NULL,
   PRIMARY KEY (`division_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -90,10 +90,10 @@ CREATE TABLE `Divisions` (
 LOCK TABLES `Divisions` WRITE;
 /*!40000 ALTER TABLE `Divisions` DISABLE KEYS */;
 INSERT INTO `Divisions` VALUES
-(1,'Division of Humanities'),
-(2,'Division of Management'),
-(3,'Division of Natural Sciences and Mathematics'),
-(4,'Division of Social Sciences');
+('DH','Division of Humanities'),
+('DM','Division of Management'),
+('DNSM','Division of Natural Sciences and Mathematics'),
+('DSS','Division of Social Sciences');
 /*!40000 ALTER TABLE `Divisions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -106,11 +106,11 @@ DROP TABLE IF EXISTS `Programs`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Programs` (
   `program_code` varchar(15) NOT NULL,
-  `division_id` int(11) NOT NULL,
+  `division_id` varchar(10) DEFAULT NULL,
   `program_name` tinytext NOT NULL,
   PRIMARY KEY (`program_code`),
   KEY `division_id` (`division_id`),
-  CONSTRAINT `Programs_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`)
+  CONSTRAINT `Programs_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -121,18 +121,18 @@ CREATE TABLE `Programs` (
 LOCK TABLES `Programs` WRITE;
 /*!40000 ALTER TABLE `Programs` DISABLE KEYS */;
 INSERT INTO `Programs` VALUES
-('BALit',1,'Bachelor of Arts in Literature'),
-('BAMA',1,'Bachelor of Arts in Media Arts'),
-('BAPolSci',4,'Bachelor of Arts in Political Science'),
-('BAPsych',4,'Bachelor of Arts in Psychology'),
-('BSA',2,'Bachelor of Science in Accountancy'),
-('BSAM',3,'Bachelor of Science in Applied Mathematics'),
-('BSBio',3,'Bachelor of Science in Biology'),
-('BSCS',3,'Bachelor of Science in Computer Science'),
-('BSEcon',4,'Bachelor of Science in Economics'),
-('BSM',2,'Bachelor of Science in Management'),
-('MM',2,'Master of Management'),
-('MSES',3,'Master of Science in Environmental Science');
+('BALit','DH','Bachelor of Arts in Literature'),
+('BAMA','DH','Bachelor of Arts in Media Arts'),
+('BAPolSci','DSS','Bachelor of Arts in Political Science'),
+('BAPsych','DSS','Bachelor of Arts in Psychology'),
+('BSA','DM','Bachelor of Science in Accountancy'),
+('BSAM','DNSM','Bachelor of Science in Applied Mathematics'),
+('BSBio','DNSM','Bachelor of Science in Biology'),
+('BSCS','DNSM','Bachelor of Science in Computer Science'),
+('BSEcon','DSS','Bachelor of Science in Economics'),
+('BSM','DM','Bachelor of Science in Management'),
+('MM','DM','Master of Management'),
+('MSES','DNSM','Master of Science in Environmental Science');
 /*!40000 ALTER TABLE `Programs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -470,4 +470,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-04-23  5:38:26
+-- Dump completed on 2026-04-23 10:19:26
