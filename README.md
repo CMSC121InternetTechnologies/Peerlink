@@ -13,12 +13,11 @@ Please intsall the following on your machine before proceeding.
 * when running the terminal in VS code please avoid using Powershell 
 
 ## Start Coding
-to start coding on the project clone the repository then inside the Peerlink folder download laravel:
+to start coding on the project clone the repository then navigate to:
 
  ```bash
-   composer create-project laravel/laravel [NAME]  
+   .../Peerlink/peerlink
    ```
-then navigate into the laravel project
 
 ## Install Laravel Dependencies 
 This reads the composer.json file and redownloads Laravel, Breeze, and any other PHP packages.
