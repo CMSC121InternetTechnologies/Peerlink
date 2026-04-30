@@ -1,171 +1,368 @@
-//  USER PROFILE DATA (TEMP STATE)
+//  STATE & MOCK DATA
 let userProfile = {
-    bio: "Computer Science student. I love coding and helping others learn! Wow.",
-    tutorCourses: ["CMSC 11", "CMSC 21"],
-    tuteeCourses: ["MATH 55"]
+  bio: "Computer Science student. I love coding and helping others learn! Wow.",
+  tutorCourses: ["CMSC 11", "CMSC 21"],
+  tuteeCourses: ["MATH 55"]
 };
 
-// Tracks current mode (tutor / tutee)
+const MOCK_TUTORS = [
+  { id: 1, name: "Alex Reyes", degree: "Computer Science Junior", courses: ["CMSC 11", "CMSC 12", "CMSC 21"], rating: 4.9, reviews: 34, initials: "AR" },
+  { id: 2, name: "Mia Santos", degree: "Mathematics Sophomore", courses: ["MATH 17", "MATH 55", "PHYS 71"], rating: 4.8, reviews: 21, initials: "MS" },
+  { id: 3, name: "Luis Tan", degree: "Computer Science Senior", courses: ["CMSC 22", "CMSC 21", "CMSC 12"], rating: 5.0, reviews: 58, initials: "LT" }
+];
+
 let currentMode = 'tutee';
+let currentView = 'profile'; 
+let activeDashboardCourses = [];
+let allTutors = [...MOCK_TUTORS];
+let selectedTutor = null;
+let dropdownOpen = false;
 
-
-// INITIALIZATION
+//  INITIALIZATION & NAVIGATION
 document.addEventListener('DOMContentLoaded', () => {
-    setMode('tutee');
-    updateProfileDisplay();
+  setMode('tutee');
+  switchView('dashboard'); // Default landing view
+  updateProfileDisplay();
+  renderTutors(MOCK_TUTORS);
 
-    // Character counter for bio input
-    const bioInput = document.getElementById('bioInput');
-    if (bioInput) {
+  // Character counter for bio input
+  const bioInput = document.getElementById('bioInput');
+  if (bioInput) {
     bioInput.addEventListener('input', () => {
-        document.getElementById('charCount').textContent = bioInput.value.length;
+      document.getElementById('charCount').textContent = bioInput.value.length;
     });
   }
 });
 
-// MODE TOGGLE (Tutor / Tutee)
+// Switch between Profile and Dashboard views
+function switchView(view) {
+  currentView = view;
+  
+  // Toggle Visibility
+  document.getElementById('dashboardView').style.display = view === 'dashboard' ? 'block' : 'none';
+  document.getElementById('profileView').style.display = view === 'profile' ? 'block' : 'none';
+
+  // Update Nav Active States
+  document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+  document.getElementById(`nav${view.charAt(0).toUpperCase() + view.slice(1)}`).classList.add('active');
+}
+
+//  MODE TOGGLE (Tutor / Tutee)
 function setMode(mode) {
-    currentMode = mode;
+  currentMode = mode;
+  document.body.className = `mode-${mode}`;
+  const roleBadge = document.getElementById('roleBadge');
 
-    // Update body class (controls theme)
-    document.body.className = `mode-${mode}`;
-    const roleBadge = document.getElementById('roleBadge');
-
-    // Update role badge text and color
-    if (mode === 'tutor') {
-        roleBadge.textContent = "TUTOR PROFILE";
-        roleBadge.style.background = "var(--teal-dark)";
-    } else {
-        roleBadge.textContent = "TUTEE PROFILE";
-        roleBadge.style.background = "var(--coral)";
-    }
+  if (mode === 'tutor') {
+      roleBadge.textContent = "TUTOR PROFILE";
+      roleBadge.style.background = "var(--teal-dark)";
+  } else {
+      roleBadge.textContent = "TUTEE PROFILE";
+      roleBadge.style.background = "var(--coral)";
+  }
 }
 
-// VIEW / EDIT MODE TOGGLE
+//  PROFILE VIEW LOGIC
 function toggleEditMode(isEdit) {
-    const viewMode = document.getElementById('profileViewMode');
-    const editMode = document.getElementById('profileEditMode');
+  const viewMode = document.getElementById('profileViewMode');
+  const editMode = document.getElementById('profileEditMode');
 
-    viewMode.style.display = isEdit ? 'none' : 'block';
-    editMode.style.display = isEdit ? 'block' : 'none';
+  viewMode.style.display = isEdit ? 'none' : 'block';
+  editMode.style.display = isEdit ? 'block' : 'none';
 
-    // Pre-fill form when entering edit mode
-    if (isEdit) {
-        document.getElementById('bioInput').value = userProfile.bio;
-        renderTags('tutor');
-        renderTags('tutee');
-    }
+  if (isEdit) {
+      document.getElementById('bioInput').value = userProfile.bio;
+      renderProfileTags('tutor');
+      renderProfileTags('tutee');
+  }
 }
 
+function addProfileCourse(type) {
+  const select = document.getElementById(`${type}Select`);
+  const selectedValue = select.value;
+  const courseList = type === 'tutor' ? userProfile.tutorCourses : userProfile.tuteeCourses;
 
-// ADD COURSE (Tutor / Tutee)
-function addCourse(type) {
-    const select = document.getElementById(`${type}Select`);
-    const selectedValue = select.value;
-
-    // Choose correct list based on type
-    const courseList = type === 'tutor'
-        ? userProfile.tutorCourses
-        : userProfile.tuteeCourses;
-
-    // Prevent duplicates
-    if (selectedValue && !courseList.includes(selectedValue)) {
-        courseList.push(selectedValue);
-        renderTags(type);
-    }
-
-    // Reset dropdown
-    select.selectedIndex = 0;
+  if (selectedValue && !courseList.includes(selectedValue)) {
+      courseList.push(selectedValue);
+      renderProfileTags(type);
+  }
+  select.selectedIndex = 0;
 }
 
+function renderProfileTags(type) {
+  const container = document.getElementById(`${type}Tags`);
+  const courseList = type === 'tutor' ? userProfile.tutorCourses : userProfile.tuteeCourses;
 
-// RENDER COURSE TAGS (EDIT MODE)
-function renderTags(type) {
-    const container = document.getElementById(`${type}Tags`);
-
-    const courseList = type === 'tutor'
-        ? userProfile.tutorCourses
-        : userProfile.tuteeCourses;
-
-    // Generate tag elements
-    container.innerHTML = courseList.map(course => `
-    <span class="filter-tag">
-        ${course}
-        <button type="button" onclick="removeTag('${course}', '${type}')">✕</button>
-    </span>
-    `).join('');
+  container.innerHTML = courseList.map(course => `
+  <span class="filter-tag">
+      ${course}
+      <button type="button" onclick="removeProfileTag('${course}', '${type}')">✕</button>
+  </span>
+  `).join('');
 }
 
-
-// REMOVE COURSE TAG
-function removeTag(course, type) {
-    if (type === 'tutor') {
-    userProfile.tutorCourses =
-        userProfile.tutorCourses.filter(c => c !== course);
-    } else {
-    userProfile.tuteeCourses =
-        userProfile.tuteeCourses.filter(c => c !== course);
-    }
-
-    renderTags(type);
+function removeProfileTag(course, type) {
+  if (type === 'tutor') {
+      userProfile.tutorCourses = userProfile.tutorCourses.filter(c => c !== course);
+  } else {
+      userProfile.tuteeCourses = userProfile.tuteeCourses.filter(c => c !== course);
+  }
+  renderProfileTags(type);
 }
 
-
-// SAVE PROFILE
 function saveProfile(event) {
-    event.preventDefault();
-    
-    // Update data from form
-    userProfile.bio = document.getElementById('bioInput').value;
-
-    // Re-render display
-    updateProfileDisplay();
-
-    // Exit edit mode
-    toggleEditMode(false);
-
-    // Feedback
-    showToast("Profile updated!");
+  event.preventDefault();
+  userProfile.bio = document.getElementById('bioInput').value;
+  updateProfileDisplay();
+  toggleEditMode(false);
+  showToast("Profile updated!");
 }
 
-
-// UPDATE PROFILE DISPLAY (VIEW MODE)
 function updateProfileDisplay() {
-    // Bio
-    document.getElementById('bioDisplay').textContent =
-    userProfile.bio || "No bio added yet.";
+  document.getElementById('bioDisplay').textContent = userProfile.bio || "No bio added yet.";
+  document.getElementById('tutorCoursesDisplay').innerHTML = userProfile.tutorCourses.map(course => `<span class="course-badge">${course}</span>`).join('');
+  document.getElementById('tuteeCoursesDisplay').innerHTML = userProfile.tuteeCourses.map(course => `<span class="course-badge">${course}</span>`).join('');
+}
 
-    // Tutor courses
-    document.getElementById('tutorCoursesDisplay').innerHTML =
-    userProfile.tutorCourses
-        .map(course => `<span class="course-badge">${course}</span>`)
-        .join('');
+//  DASHBOARD (EXPLORE) LOGIC
+function toggleCourseDropdown() {
+  dropdownOpen = !dropdownOpen;
+  document.getElementById('courseDropdown').classList.toggle('open', dropdownOpen);
+  if (dropdownOpen) setTimeout(() => document.getElementById('courseInput').focus(), 50);
+}
 
-    // Tutee courses
-    document.getElementById('tuteeCoursesDisplay').innerHTML =
-    userProfile.tuteeCourses
-        .map(course => `<span class="course-badge">${course}</span>`)
-        .join('');
+document.addEventListener('click', (e) => {
+  const adder = document.querySelector('.course-adder');
+  if (adder && !adder.contains(e.target)) {
+    dropdownOpen = false;
+    document.getElementById('courseDropdown').classList.remove('open');
+  }
+});
+
+function handleCourseInput(e) {
+  if (e.key === 'Enter') {
+    const val = document.getElementById('courseInput').value.trim().toUpperCase();
+    if (val) {
+      addFilterCourse(val);
+      document.getElementById('courseInput').value = '';
     }
+  }
+}
 
-// DELETE MODAL CONTROLS
+function addFilterCourse(code) {
+  code = code.toUpperCase().trim();
+  if (!code || activeDashboardCourses.includes(code)) return;
+  activeDashboardCourses.push(code);
+  renderFilterTags();
+  fetchTutors();
+  dropdownOpen = false;
+  document.getElementById('courseDropdown').classList.remove('open');
+}
+
+function removeFilterCourse(code) {
+  activeDashboardCourses = activeDashboardCourses.filter(c => c !== code);
+  renderFilterTags();
+  fetchTutors();
+}
+
+function renderFilterTags() {
+  const container = document.getElementById('filterTags');
+  container.innerHTML = activeDashboardCourses.map(code => `
+    <span class="filter-tag">
+      ${code}
+      <button onclick="removeFilterCourse('${code}')" title="Remove">✕</button>
+    </span>
+  `).join('');
+}
+
+function filterTutors() {
+  const query = document.getElementById('searchName').value.trim().toLowerCase();
+  const filtered = allTutors.filter(t => {
+    const nameMatch = !query || t.name.toLowerCase().includes(query);
+    const courseMatch = activeDashboardCourses.length === 0 || activeDashboardCourses.some(c => t.courses.includes(c));
+    return nameMatch && courseMatch;
+  });
+  renderTutors(filtered);
+}
+
+async function fetchTutors() {
+  if (activeDashboardCourses.length === 0) {
+    allTutors = [...MOCK_TUTORS];
+    filterTutors();
+    return;
+  }
+  const params = activeDashboardCourses.map(c => `subject=${encodeURIComponent(c)}`).join('&');
+  try {
+    const res = await fetch(`/api/search_tutors.php?${params}`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    allTutors = data.tutors || [];
+    filterTutors();
+  } catch (err) {
+    allTutors = MOCK_TUTORS.filter(t => activeDashboardCourses.some(c => t.courses.includes(c)));
+    filterTutors();
+  }
+}
+
+function renderTutors(tutors) {
+  const grid = document.getElementById('tutorsGrid');
+  const empty = document.getElementById('emptyState');
+
+  if (!tutors.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'flex';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.innerHTML = tutors.map((t, i) => `
+    <div class="tutor-card" style="animation-delay: ${i * 0.06}s">
+      <div class="tutor-card-header">
+        <div class="tutor-avatar">${t.initials || t.name[0]}</div>
+        <div class="tutor-info">
+          <div class="tutor-name">${t.name}</div>
+          <div class="tutor-degree">${t.degree || ''}</div>
+          <div class="tutor-rating"><span class="star">★</span> ${(t.rating || 0).toFixed(1)} <span>(${t.reviews || 0} reviews)</span></div>
+        </div>
+      </div>
+      <div class="tutor-courses">
+        ${(t.courses || []).map(c => `<span class="course-badge">${c}</span>`).join('')}
+      </div>
+      <button class="btn-primary full-width" style="background: var(--purple);" onclick="openSessionModal(${t.id})">Request session</button>
+    </div>
+  `).join('');
+}
+
+//  MODALS & TOAST
+function openSessionModal(id) {
+  const tutor = allTutors.find(t => t.id === id);
+  if (!tutor) return;
+  selectedTutor = tutor;
+
+  document.getElementById('modalName').textContent = tutor.name;
+  document.getElementById('modalSub').textContent = tutor.degree || '';
+  document.getElementById('modalCourses').innerHTML = (tutor.courses || []).map(c => `<span class="course-badge">${c}</span>`).join('');
+  document.getElementById('modalAvatar').innerHTML = tutor.initials || tutor.name[0];
+  document.getElementById('sessionModalOverlay').classList.add('open');
+}
+
+function closeSessionModal() {
+  document.getElementById('sessionModalOverlay').classList.remove('open');
+  selectedTutor = null;
+}
+
+function submitRequest() {
+  if (!document.getElementById('sessionTopic').value.trim() || !document.getElementById('sessionDate').value) {
+    showToast('Please fill out all required fields.');
+    return;
+  }
+  closeSessionModal();
+  showToast(`✅ Request sent to ${selectedTutor?.name}!`);
+  document.getElementById('sessionTopic').value = '';
+  document.getElementById('sessionDate').value = '';
+  document.getElementById('sessionMessage').value = '';
+}
+
 function openDeleteModal() {
     document.getElementById('deleteModal').classList.add('open');
 }
+
 function closeDeleteModal() {
     document.getElementById('deleteModal').classList.remove('open');
 }
 
-
-// TOAST NOTIFICATION
 function showToast(message) {
-    const toast = document.getElementById('toast');
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
 
-    toast.textContent = message;
-    toast.classList.add('show');
+// ===== VIEW PENDING REQUESTS (TUTOR MODE) =====
+let pendingRequests = [];
 
-    // Auto-hide after 3s
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
+async function fetchRequests() {
+  try {
+    // Attempt to fetch from your new PHP endpoint
+    const res = await fetch('/api/get_requests.php');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    pendingRequests = data.requests || [];
+  } catch (err) {
+    console.warn('API unavailable, using frontend fallback mock data.');
+    // Fallback if PHP isn't running
+    pendingRequests = [
+      { id: 101, tuteeName: "Juan Dela Cruz", topic: "Pointers and Memory Allocation in C", date: "2026-05-05T14:00", message: "Hi! I am struggling with our CMSC 21 lab about pointers. Can you help me debug my code?" }
+    ];
+  }
+  renderRequests();
+}
+
+function openRequestsModal() {
+  fetchRequests(); // Fetch fresh data every time the modal opens
+  document.getElementById('requestsModalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden'; // prevent background scrolling
+}
+
+function closeRequestsModal() {
+  document.getElementById('requestsModalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function renderRequests() {
+  const list = document.getElementById('requestsList');
+  
+  if (pendingRequests.length === 0) {
+    list.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No pending requests! 🎉</p>`;
+    return;
+  }
+
+  list.innerHTML = pendingRequests.map(req => {
+    // Format the date nicely
+    const dateObj = new Date(req.date);
+    const dateStr = dateObj.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    return `
+    <div class="request-card" id="reqCard-${req.id}">
+      <div class="request-header">
+        <div class="request-tutee">${req.tuteeName}</div>
+        <div class="course-badge" style="margin:0; background: var(--teal); color: white;">New</div>
+      </div>
+      <div class="request-topic">${req.topic}</div>
+      <div class="request-date">🗓 ${dateStr}</div>
+      
+      ${req.message ? `<div class="request-msg">"${req.message}"</div>` : ''}
+      
+      <div class="request-actions">
+        <input type="text" class="reply-input" id="reply-${req.id}" placeholder="Type a reply note..." />
+        <button class="btn-accept" onclick="respondRequest(${req.id}, 'accepted')">Accept</button>
+        <button class="btn-decline" onclick="respondRequest(${req.id}, 'declined')">Decline</button>
+      </div>
+    </div>
+    `;
+  }).join('');
+}
+
+function respondRequest(id, status) {
+  const replyInput = document.getElementById(`reply-${id}`).value.trim();
+  
+  // In production, you would POST this to another PHP file (e.g., /api/respond_request.php)
+  console.log(`Request ${id} marked as ${status}. Tutor reply:`, replyInput || "[No reply]");
+
+  // Remove the card from the UI
+  pendingRequests = pendingRequests.filter(r => r.id !== id);
+  renderRequests();
+  
+  // Update dashboard counter mockup
+  const countBadge = document.querySelector('.dash-card-value');
+  if (countBadge && status === 'accepted') {
+     countBadge.textContent = parseInt(countBadge.textContent) + 1;
+  }
+
+  showToast(`Session ${status}!`);
+  
+  // Auto-close if list is empty
+  if (pendingRequests.length === 0) {
+    setTimeout(closeRequestsModal, 1500);
+  }
 }
