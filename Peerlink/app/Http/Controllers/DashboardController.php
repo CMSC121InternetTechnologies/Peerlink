@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use Illuminate\Http\Request;
-use function Laravel\Prompts\alert;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        alert("Redirecting to dashboard"); 
+        $courses = Course::orderBy('course_code')->get();
+        return view('dashboard', compact('courses'));
     }
 }

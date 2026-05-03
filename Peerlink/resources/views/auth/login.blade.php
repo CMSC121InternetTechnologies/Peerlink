@@ -1,61 +1,27 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PeerLink | Log In</title>
-    @vite(['resources/css/style.css', 'resources/js/app.js'])
-</head>
-<body>
-    <div class="profile-container"> 
-        <div class="profile-card">
-            <h2>Welcome Back to PeerLink</h2>
+<x-guest-layout>
+    <div class="profile-card" style="padding: 2.5rem;">
+        <h2 class="page-title" style="text-align: center; font-size: 1.5rem;">Welcome Back</h2>
 
-            @if (session('status'))
-                <div style="color: green; margin-bottom: 1rem;">
-                    {{ session('status') }}
+        <form method="POST" action="{{ route('login') }}" class="modal-form">
+            @csrf
+
+            @if ($errors->any())
+                <div style="color: var(--coral); font-size: 0.85rem; margin-bottom: 1rem;">
+                    {{ $errors->first() }}
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('login') }}">
-                @csrf
+            <label>Email</label>
+            <input type="email" name="email" value="{{ old('email') }}" required autofocus>
 
-                <div class="input-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus>
-                    
-                    @error('email')
-                        <span style="color: red; font-size: 0.8rem;">{{ $message }}</span>
-                    @enderror
-                </div>
+            <label>Password</label>
+            <input type="password" name="password" required>
 
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                    
-                    @error('password')
-                        <span style="color: red; font-size: 0.8rem;">{{ $message }}</span>
-                    @enderror
-                </div>
+            <button type="submit" class="btn-primary full-width" style="margin-top: 1.5rem;">Log in</button>
 
-                <div class="input-group" style="display: flex; align-items: center; gap: 0.5rem; flex-direction: row;">
-                    <input type="checkbox" id="remember_me" name="remember">
-                    <label for="remember_me" style="margin: 0; font-weight: normal;">Remember me</label>
-                </div>
-
-                <div class="form-actions-spacer" style="margin-top: 1.5rem; align-items: center;">
-                    
-                    @if (Route::has('password.request'))
-                        <a href="{{ route('password.request') }}" style="font-size: 0.9rem; color: #555;">Forgot your password?</a>
-                    @endif
-                <a href = "{{ route('register') }}">Sign-up</a>
-                
-                    <button type="submit" class="btn-primary">Log in</button>
-                    
-                </div>
-            </form>
-            
-        </div>
+            <p style="text-align: center; margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
+                Don't have an account? <a href="{{ route('register') }}" style="color: var(--teal-dark); text-decoration: none; font-weight: 600;">Register</a>
+            </p>
+        </form>
     </div>
-</body>
-</html>
+</x-guest-layout>

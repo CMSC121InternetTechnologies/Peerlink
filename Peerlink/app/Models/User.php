@@ -25,6 +25,7 @@ class User extends Authenticatable
         'last_name',
         'contact_number',
         'current_year_level',
+        'program_code',
     ];
 
     protected $hidden = [
@@ -58,5 +59,15 @@ class User extends Authenticatable
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+    }
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class, 'program_code', 'program_code');
+    }
+
+    public function tutorProfile()
+    {
+        return $this->hasOne(TutorProfile::class, 'user_id', 'user_id');
     }
 }
