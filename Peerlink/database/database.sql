@@ -729,6 +729,7 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+<<<<<<< HEAD
 --
 -- Table structure for table `Notifications`
 --
@@ -755,3 +756,6 @@ LOCK TABLES `Notifications` WRITE;
 UNLOCK TABLES;
 
 -- Dump completed on 2026-05-05 13:28:47
+=======
+-- Dump completed on 2026-05-05 13:28:47
+>>>>>>> 4a3087d722830627b6c1b9470aad1c7222af29d2
