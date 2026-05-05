@@ -28,50 +28,39 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- ---------------------------------------------------------------
 -- SCHEMA PATCHES
--- Add columns/values that may be missing if the original
--- database.sql was used instead of the updated version.
+-- Each ALTER TABLE runs independently so that if a column already
+-- exists the duplicate-column error is shown but execution continues.
 -- ---------------------------------------------------------------
 
--- Add counter-proposal columns to Requests if not present
-ALTER TABLE `Requests`
-  ADD COLUMN IF NOT EXISTS `counter_proposed_time`     datetime                      DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `counter_proposed_message`  text                          DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `counter_proposed_modality` enum('In-Person','Online')    DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `counter_proposed_room_id`  int(11)                       DEFAULT NULL;
+-- Add counter-proposal columns one at a time (errors are harmless if they already exist)
+ALTER TABLE `Requests` ADD COLUMN `counter_proposed_time`     datetime                   DEFAULT NULL;
+ALTER TABLE `Requests` ADD COLUMN `counter_proposed_message`  text                       DEFAULT NULL;
+ALTER TABLE `Requests` ADD COLUMN `counter_proposed_modality` enum('In-Person','Online') DEFAULT NULL;
+ALTER TABLE `Requests` ADD COLUMN `counter_proposed_room_id`  int(11)                    DEFAULT NULL;
 
--- Ensure CounterProposed exists in the status enum
+-- Extend status enum to include CounterProposed
 ALTER TABLE `Requests`
   MODIFY COLUMN `status` enum('Pending','Approved','Declined','Expired','CounterProposed') DEFAULT 'Pending';
 
--- Add FK on counter_proposed_room_id if not already present
--- (wrapped in a procedure to skip if it exists)
-SET @fk_exists = (
-  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME        = 'Requests'
-    AND CONSTRAINT_NAME   = 'Requests_ibfk_4'
-    AND CONSTRAINT_TYPE   = 'FOREIGN KEY'
-);
-SET @sql = IF(@fk_exists = 0,
-  'ALTER TABLE `Requests` ADD CONSTRAINT `Requests_ibfk_4` FOREIGN KEY (`counter_proposed_room_id`) REFERENCES `Rooms` (`room_id`)',
-  'SELECT 1'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- Add FK for counter_proposed_room_id (error is harmless if it already exists)
+ALTER TABLE `Requests`
+  ADD CONSTRAINT `Requests_ibfk_4`
+  FOREIGN KEY (`counter_proposed_room_id`) REFERENCES `Rooms` (`room_id`);
 
--- Create Notifications table if it was not in the original dump
+-- Create Notifications without FOREIGN KEY constraints to avoid charset/collation
+-- incompatibilities between MySQL and MariaDB versions.
+-- Referential integrity is enforced at the application layer by Eloquent.
 CREATE TABLE IF NOT EXISTS `Notifications` (
-  `notification_id` char(36)     NOT NULL DEFAULT (uuid()),
-  `user_id`         char(36)     NOT NULL,
-  `type`            varchar(50)  NOT NULL,
-  `message`         text         NOT NULL,
-  `request_id`      char(36)     DEFAULT NULL,
-  `is_read`         tinyint(1)   NOT NULL DEFAULT 0,
-  `created_at`      timestamp    NULL DEFAULT current_timestamp(),
+  `notification_id` char(36)    NOT NULL,
+  `user_id`         char(36)    NOT NULL,
+  `type`            varchar(50) NOT NULL,
+  `message`         text        NOT NULL,
+  `request_id`      char(36)    DEFAULT NULL,
+  `is_read`         tinyint(1)  NOT NULL DEFAULT 0,
+  `created_at`      timestamp   NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`notification_id`),
-  KEY `user_id`    (`user_id`),
-  KEY `request_id` (`request_id`),
-  CONSTRAINT `Notifications_ibfk_1` FOREIGN KEY (`user_id`)     REFERENCES `Users`    (`user_id`)     ON DELETE CASCADE,
-  CONSTRAINT `Notifications_ibfk_2` FOREIGN KEY (`request_id`)  REFERENCES `Requests` (`request_id`)  ON DELETE SET NULL
+  KEY `idx_notif_user`    (`user_id`),
+  KEY `idx_notif_request` (`request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------
