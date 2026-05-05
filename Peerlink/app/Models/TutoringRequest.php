@@ -12,7 +12,11 @@ class TutoringRequest extends Model
     protected $keyType = 'string';
     public const UPDATED_AT = null;
 
-    protected $fillable = ['student_id', 'tutor_id', 'course_id', 'message', 'status'];
+    protected $fillable = [
+        'student_id', 'tutor_id', 'course_id', 'message', 'status',
+        'counter_proposed_time', 'counter_proposed_message',
+        'counter_proposed_modality', 'counter_proposed_room_id',
+    ];
 
     protected static function boot()
     {

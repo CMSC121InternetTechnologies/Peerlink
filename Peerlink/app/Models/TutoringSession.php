@@ -33,4 +33,9 @@ class TutoringSession extends Model
     {
         return $this->belongsTo(Room::class, 'room_id', 'room_id');
     }
+
+    public function reviews()
+    {
+        return $this->hasMany(SessionReview::class, 'session_id', 'session_id');
+    }
 }

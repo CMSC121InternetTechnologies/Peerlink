@@ -6,6 +6,8 @@ use App\Models\Course;
 use App\Models\CourseTopic;
 use App\Models\Room;
 use App\Models\TutorProfile;
+use App\Models\TutoringRequest;
+use App\Models\TutoringSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +16,7 @@ class ProfileApiController extends Controller
     // GET /api/profile
     public function show(Request $request)
     {
-        $user = $request->user();
+        $user         = $request->user();
         $tutorProfile = TutorProfile::find($user->user_id);
 
         $tutorCourses = [];
@@ -29,11 +31,25 @@ class ProfileApiController extends Controller
                 ->toArray();
         }
 
+        // Tutor dashboard stats
+        $upcomingSessions = 0;
+        if ($tutorProfile) {
+            $upcomingSessions = TutoringSession::whereHas('request', function ($q) use ($user) {
+                $q->where('tutor_id', $user->user_id);
+            })
+            ->where('status', 'Scheduled')
+            ->where('scheduled_time', '>', now())
+            ->count();
+        }
+
         return response()->json([
-            'bio'         => $tutorProfile?->bio ?? '',
-            'isTutor'     => $tutorProfile !== null,
-            'tutorCourses'=> $tutorCourses,
-            'rooms'       => Room::all(['room_id', 'room_code', 'room_name', 'room_type']),
+            'bio'              => $tutorProfile?->bio ?? '',
+            'isTutor'          => $tutorProfile !== null,
+            'tutorCourses'     => $tutorCourses,
+            'coursesCount'     => count($tutorCourses),
+            'ratingAvg'        => $tutorProfile ? (float) $tutorProfile->rating_avg : 0.0,
+            'upcomingSessions' => $upcomingSessions,
+            'rooms'            => Room::all(['room_id', 'room_code', 'room_name', 'room_type']),
         ]);
     }
 

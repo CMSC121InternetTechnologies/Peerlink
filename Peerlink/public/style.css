@@ -840,3 +840,185 @@ body.mode-tutee #tuteeBtn {
 .btn-decline:hover {
     background: #fff8f7;
 }
+
+/* ===== NOTIFICATION BELL ===== */
+.notif-bell-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.notif-bell-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  transition: var(--transition);
+}
+
+.notif-bell-btn:hover { background: var(--cream-dark); color: var(--text); }
+
+.notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--coral);
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.notif-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 320px;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hover);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.notif-dropdown.open { display: block; }
+
+.notif-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f0ebe0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.notif-mark-read {
+  background: none;
+  border: none;
+  color: var(--teal);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.notif-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f5f0e8;
+  font-size: 0.875rem;
+}
+
+.notif-item.notif-unread { background: var(--purple-light); }
+
+.notif-msg { color: var(--text); line-height: 1.4; }
+
+.notif-time { color: var(--text-muted); font-size: 0.75rem; margin-top: 0.2rem; }
+
+.notif-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* ===== COUNTER-PROPOSAL BOX ===== */
+.counter-proposal-box {
+  background: var(--purple-light);
+  border: 1px solid #c9bff5;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* ===== SESSION DETAILS BOX ===== */
+.session-details-box {
+  background: #e8f7ee;
+  border: 1px solid #b2dfc0;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* ===== STAR RATING ===== */
+.star-rating {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0.25rem;
+}
+
+.star-btn {
+  font-size: 2rem;
+  cursor: pointer;
+  color: #d0c8b0;
+  line-height: 1;
+  transition: color 0.15s;
+  user-select: none;
+}
+
+.star-btn.active,
+.star-btn:hover { color: #f5c518; }
+
+/* ===== MY REQUESTS FILTER ROW ===== */
+.filter-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* ===== REQUEST MODAL TABS ===== */
+.req-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--cream-dark);
+  padding-bottom: 0;
+}
+
+.req-tab {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: var(--transition);
+}
+
+.req-tab.active {
+  color: var(--purple);
+  border-bottom-color: var(--purple);
+}
+
+/* ===== ONBOARDING MODAL ===== */
+.ob-step {
+  text-align: left;
+}
+
+.ob-step h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+/* ===== TUTOR CTA BUTTONS ===== */
+.tutor-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
