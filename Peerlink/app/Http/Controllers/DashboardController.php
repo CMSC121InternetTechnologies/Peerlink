@@ -9,7 +9,8 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $courses = Course::orderBy('course_code')->get();
-        return view('dashboard', compact('courses'));
+        $courses    = Course::orderBy('course_code')->get();
+        $onboarding = session('onboarding', false);
+        return view('dashboard', compact('courses', 'onboarding'));
     }
 }

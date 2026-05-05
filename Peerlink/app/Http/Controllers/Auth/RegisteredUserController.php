@@ -43,6 +43,7 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
         Auth::login($user);
+        session()->flash('onboarding', true);
         return redirect(route('dashboard', absolute: false));
     }
 }

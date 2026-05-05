@@ -94,7 +94,7 @@ CREATE TABLE `Users` (
   UNIQUE KEY `email` (`email`),
   KEY `fk_users_program` (`program_code`),
   CONSTRAINT `fk_users_program` FOREIGN KEY (`program_code`) REFERENCES `Programs` (`program_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,7 +202,7 @@ CREATE TABLE `Tutor_Profiles` (
   `rating_avg` decimal(3,2) DEFAULT 0.00,
   PRIMARY KEY (`user_id`),
   CONSTRAINT `Tutor_Profiles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -281,16 +281,22 @@ CREATE TABLE `Requests` (
   `tutor_id` char(36) DEFAULT NULL,
   `course_id` int(11) NOT NULL,
   `message` text DEFAULT NULL,
-  `status` enum('Pending','Approved','Declined','Expired') DEFAULT 'Pending',
+  `status` enum('Pending','Approved','Declined','Expired','CounterProposed') DEFAULT 'Pending',
+  `counter_proposed_time` datetime DEFAULT NULL,
+  `counter_proposed_message` text DEFAULT NULL,
+  `counter_proposed_modality` enum('In-Person','Online') DEFAULT NULL,
+  `counter_proposed_room_id` int(11) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`request_id`),
   KEY `student_id` (`student_id`),
   KEY `tutor_id` (`tutor_id`),
   KEY `course_id` (`course_id`),
+  KEY `counter_proposed_room_id` (`counter_proposed_room_id`),
   CONSTRAINT `Requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `Users` (`user_id`),
   CONSTRAINT `Requests_ibfk_2` FOREIGN KEY (`tutor_id`) REFERENCES `Users` (`user_id`),
-  CONSTRAINT `Requests_ibfk_3` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+  CONSTRAINT `Requests_ibfk_3` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`),
+  CONSTRAINT `Requests_ibfk_4` FOREIGN KEY (`counter_proposed_room_id`) REFERENCES `Rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -422,7 +428,7 @@ CREATE TABLE `Session_Reviews` (
   CONSTRAINT `Session_Reviews_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`),
   CONSTRAINT `Session_Reviews_ibfk_2` FOREIGN KEY (`reviewer_id`) REFERENCES `Users` (`user_id`),
   CONSTRAINT `Session_Reviews_ibfk_3` FOREIGN KEY (`reviewee_id`) REFERENCES `Users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -722,5 +728,30 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+--
+-- Table structure for table `Notifications`
+--
+
+DROP TABLE IF EXISTS `Notifications`;
+CREATE TABLE `Notifications` (
+  `notification_id` char(36) NOT NULL DEFAULT (uuid()),
+  `user_id` char(36) NOT NULL,
+  `type` varchar(50) NOT NULL,
+  `message` text NOT NULL,
+  `request_id` char(36) DEFAULT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`notification_id`),
+  KEY `user_id` (`user_id`),
+  KEY `request_id` (`request_id`),
+  CONSTRAINT `Notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `Notifications_ibfk_2` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+LOCK TABLES `Notifications` WRITE;
+/*!40000 ALTER TABLE `Notifications` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Notifications` ENABLE KEYS */;
+UNLOCK TABLES;
 
 -- Dump completed on 2026-05-05 13:28:47

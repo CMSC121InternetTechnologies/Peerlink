@@ -3,9 +3,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
+use App\Models\Notification;
 use App\Models\Room;
+use App\Models\SessionReview;
 use App\Models\TutoringRequest;
 use App\Models\TutoringSession;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -41,7 +44,6 @@ class RequestController extends Controller
         }
 
         if ($role === 'broadcast') {
-            // All pending broadcast requests (available for any tutor to claim)
             $requests = TutoringRequest::whereNull('tutor_id')
                 ->where('status', 'Pending')
                 ->with(['student', 'course'])
@@ -62,11 +64,16 @@ class RequestController extends Controller
             ]);
         }
 
-        // Student view: requests they sent
+        // Student view: requests they sent — exclude self-referential group sessions
         $requests = TutoringRequest::where('student_id', $user->user_id)
             ->where(function ($q) use ($user) {
                 $q->whereNull('tutor_id')
                   ->orWhere('tutor_id', '!=', $user->user_id);
+            })
+            ->where(function ($q) {
+                // Exclude GROUP broadcasts where student == tutor (tutor-initiated group sessions)
+                $q->whereNull('message')
+                  ->orWhere('message', 'not like', '[GROUP]%');
             })
             ->with(['tutor', 'course', 'session.room'])
             ->orderByDesc('created_at')
@@ -79,13 +86,26 @@ class RequestController extends Controller
                 'tutorName' => $r->tutor
                     ? ($r->tutor->first_name . ' ' . $r->tutor->last_name)
                     : 'Broadcast',
+                'tutorId'   => $r->tutor_id,
                 'status'    => $r->status,
                 'message'   => $r->message,
                 'createdAt' => $r->created_at,
-                'session'   => $r->session ? [
+                'counterProposal' => $r->status === 'CounterProposed' ? [
+                    'proposedTime'     => $r->counter_proposed_time,
+                    'message'          => $r->counter_proposed_message,
+                    'modality'         => $r->counter_proposed_modality,
+                    'room'             => $r->counter_proposed_room_id
+                        ? Room::find($r->counter_proposed_room_id)?->room_name
+                        : null,
+                ] : null,
+                'session' => $r->session ? [
+                    'session_id'    => $r->session->session_id,
                     'modality'      => $r->session->modality,
                     'room'          => $r->session->room?->room_name,
                     'scheduledTime' => $r->session->scheduled_time,
+                    'hasReview'     => SessionReview::where('session_id', $r->session->session_id)
+                        ->where('reviewer_id', $user->user_id)
+                        ->exists(),
                 ] : null,
             ]),
         ]);
@@ -117,33 +137,149 @@ class RequestController extends Controller
             'status'     => 'Pending',
         ]);
 
+        // Notify the tutor if this is a direct request
+        if (!empty($validated['tutor_id'])) {
+            $studentName = $user->first_name . ' ' . $user->last_name;
+            Notification::create([
+                'user_id'    => $validated['tutor_id'],
+                'type'       => 'new_request',
+                'message'    => "{$studentName} sent you a tutoring request for {$validated['course_code']}.",
+                'request_id' => $req->request_id,
+                'is_read'    => false,
+            ]);
+        }
+
         return response()->json(['message' => 'Request submitted.', 'request_id' => $req->request_id], 201);
     }
 
-    // PATCH /api/requests/{id}  (US_11 accept/decline, US_12 broadcast claim, US_14 logistics)
+    // PATCH /api/requests/{id}
+    // Tutor actions: accept | decline | claim | counter_propose
+    // Student actions: student_accept | student_decline  (only when CounterProposed)
     public function respond(Request $request, string $id)
     {
         $user = $request->user();
         $req  = TutoringRequest::findOrFail($id);
 
-        // Allow tutor to respond if they are the assigned tutor, OR it's a broadcast (claim)
+        $validated = $request->validate([
+            'action'               => ['required', Rule::in(['accept', 'decline', 'claim', 'counter_propose', 'student_accept', 'student_decline'])],
+            'modality'             => ['nullable', Rule::in(['In-Person', 'Online'])],
+            'room_id'              => ['nullable', 'integer', 'exists:Rooms,room_id'],
+            'meeting_link'         => ['nullable', 'string', 'max:500'],
+            'scheduled_time'       => ['nullable', 'string'],
+            'counter_time'         => ['nullable', 'string'],
+            'counter_message'      => ['nullable', 'string', 'max:1000'],
+            'counter_modality'     => ['nullable', Rule::in(['In-Person', 'Online'])],
+            'counter_room_id'      => ['nullable', 'integer', 'exists:Rooms,room_id'],
+        ]);
+
+        $action = $validated['action'];
+
+        // --- Student responds to a counter-proposal ---
+        if ($action === 'student_accept' || $action === 'student_decline') {
+            if ($req->student_id !== $user->user_id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+            if ($req->status !== 'CounterProposed') {
+                return response()->json(['error' => 'No counter-proposal to respond to.'], 422);
+            }
+
+            if ($action === 'student_decline') {
+                $req->status = 'Declined';
+                $req->save();
+
+                if ($req->tutor_id) {
+                    $studentName = $user->first_name . ' ' . $user->last_name;
+                    Notification::create([
+                        'user_id'    => $req->tutor_id,
+                        'type'       => 'counter_declined',
+                        'message'    => "{$studentName} declined your counter-proposal for {$req->course?->course_code}.",
+                        'request_id' => $req->request_id,
+                        'is_read'    => false,
+                    ]);
+                }
+
+                return response()->json(['message' => 'Counter-proposal declined.']);
+            }
+
+            // student_accept: create session from counter-proposed details
+            $roomId = $req->counter_proposed_room_id
+                ?? Room::where('room_type', 'Physical')->first()?->room_id
+                ?? 1;
+
+            $req->status = 'Approved';
+            $req->save();
+
+            try {
+                TutoringSession::create([
+                    'request_id'     => $req->request_id,
+                    'modality'       => $req->counter_proposed_modality ?? 'In-Person',
+                    'room_id'        => $roomId,
+                    'meeting_link'   => null,
+                    'scheduled_time' => $req->counter_proposed_time ?? now()->addDays(3)->format('Y-m-d H:i:s'),
+                    'status'         => 'Scheduled',
+                ]);
+            } catch (QueryException $e) {
+                return response()->json(['error' => 'A session already exists for this request.'], 422);
+            }
+
+            if ($req->tutor_id) {
+                $studentName = $user->first_name . ' ' . $user->last_name;
+                Notification::create([
+                    'user_id'    => $req->tutor_id,
+                    'type'       => 'counter_accepted',
+                    'message'    => "{$studentName} accepted your counter-proposal for {$req->course?->course_code}.",
+                    'request_id' => $req->request_id,
+                    'is_read'    => false,
+                ]);
+            }
+
+            return response()->json(['message' => 'Counter-proposal accepted and session scheduled.']);
+        }
+
+        // --- Tutor-side actions ---
         $isBroadcast = $req->tutor_id === null;
         if (!$isBroadcast && $req->tutor_id !== $user->user_id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $validated = $request->validate([
-            'action'         => ['required', Rule::in(['accept', 'decline', 'claim'])],
-            'modality'       => ['nullable', Rule::in(['In-Person', 'Online'])],
-            'room_id'        => ['nullable', 'integer', 'exists:Rooms,room_id'],
-            'meeting_link'   => ['nullable', 'string', 'max:500'],
-            'scheduled_time' => ['nullable', 'string'],
-        ]);
-
-        if ($validated['action'] === 'decline') {
+        if ($action === 'decline') {
             $req->status = 'Declined';
             $req->save();
+
+            $tutorName = $user->first_name . ' ' . $user->last_name;
+            Notification::create([
+                'user_id'    => $req->student_id,
+                'type'       => 'request_declined',
+                'message'    => "{$tutorName} declined your tutoring request for {$req->course?->course_code}.",
+                'request_id' => $req->request_id,
+                'is_read'    => false,
+            ]);
+
             return response()->json(['message' => 'Request declined.']);
+        }
+
+        if ($action === 'counter_propose') {
+            if (empty($validated['counter_time'])) {
+                return response()->json(['error' => 'counter_time is required for a counter-proposal.'], 422);
+            }
+
+            $req->status                   = 'CounterProposed';
+            $req->counter_proposed_time    = $validated['counter_time'];
+            $req->counter_proposed_message = $validated['counter_message'] ?? null;
+            $req->counter_proposed_modality = $validated['counter_modality'] ?? null;
+            $req->counter_proposed_room_id  = $validated['counter_room_id'] ?? null;
+            $req->save();
+
+            $tutorName = $user->first_name . ' ' . $user->last_name;
+            Notification::create([
+                'user_id'    => $req->student_id,
+                'type'       => 'counter_proposed',
+                'message'    => "{$tutorName} proposed a new schedule for your {$req->course?->course_code} request.",
+                'request_id' => $req->request_id,
+                'is_read'    => false,
+            ]);
+
+            return response()->json(['message' => 'Counter-proposal sent.']);
         }
 
         // Accept or Claim: create session
@@ -157,13 +293,26 @@ class RequestController extends Controller
             ?? Room::where('room_type', 'Physical')->first()?->room_id
             ?? 1;
 
-        TutoringSession::create([
-            'request_id'     => $req->request_id,
-            'modality'       => $validated['modality'] ?? 'In-Person',
-            'room_id'        => $roomId,
-            'meeting_link'   => $validated['meeting_link'] ?? null,
-            'scheduled_time' => $validated['scheduled_time'] ?? now()->addDays(3)->format('Y-m-d H:i:s'),
-            'status'         => 'Scheduled',
+        try {
+            TutoringSession::create([
+                'request_id'     => $req->request_id,
+                'modality'       => $validated['modality'] ?? 'In-Person',
+                'room_id'        => $roomId,
+                'meeting_link'   => $validated['meeting_link'] ?? null,
+                'scheduled_time' => $validated['scheduled_time'] ?? now()->addDays(3)->format('Y-m-d H:i:s'),
+                'status'         => 'Scheduled',
+            ]);
+        } catch (QueryException $e) {
+            return response()->json(['error' => 'A session already exists for this request.'], 422);
+        }
+
+        $tutorName = $user->first_name . ' ' . $user->last_name;
+        Notification::create([
+            'user_id'    => $req->student_id,
+            'type'       => 'request_accepted',
+            'message'    => "{$tutorName} accepted your tutoring request for {$req->course?->course_code}.",
+            'request_id' => $req->request_id,
+            'is_read'    => false,
         ]);
 
         return response()->json(['message' => 'Request accepted and session scheduled.']);
@@ -189,7 +338,6 @@ class RequestController extends Controller
                 ->first()?->room_id
             ?? 1;
 
-        // Self-referential request used as a placeholder for tutor-initiated group sessions
         $req = TutoringRequest::create([
             'student_id' => $user->user_id,
             'tutor_id'   => $user->user_id,
