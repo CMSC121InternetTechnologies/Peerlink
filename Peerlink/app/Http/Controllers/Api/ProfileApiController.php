@@ -20,16 +20,8 @@ class ProfileApiController extends Controller
         $tutorProfile = TutorProfile::find($user->user_id);
 
         $tutorCourses = [];
-        if ($tutorProfile) {
-            $tutorCourses = $tutorProfile->topics()
-                ->with('course')
-                ->get()
-                ->pluck('course.course_code')
-                ->filter()
-                ->unique()
-                ->values()
-                ->toArray();
-        }
+        
+        if ($tutorProfile) $tutorCourses = $tutorProfile->courses()->pluck('course_code')->toArray();
 
         // Tutor dashboard stats
         $upcomingSessions = 0;
@@ -43,9 +35,12 @@ class ProfileApiController extends Controller
         }
 
         return response()->json([
+            'userId'           => $user->user_id,
+            'hasPhoto'         => \App\Models\UserPhoto::where('user_id', $user->user_id)->exists(),
             'bio'              => $tutorProfile?->bio ?? '',
             'isTutor'          => $tutorProfile !== null,
             'tutorCourses'     => $tutorCourses,
+            'tuteeCourses'     => $user->tuteeCourses()->pluck('course_code')->toArray(),
             'coursesCount'     => count($tutorCourses),
             'ratingAvg'        => $tutorProfile ? (float) $tutorProfile->rating_avg : 0.0,
             'upcomingSessions' => $upcomingSessions,
@@ -62,6 +57,8 @@ class ProfileApiController extends Controller
             'bio'            => ['nullable', 'string', 'max:250'],
             'tutorCourses'   => ['nullable', 'array'],
             'tutorCourses.*' => ['string', 'exists:Courses,course_code'],
+            'tuteeCourses'   => ['nullable', 'array'],
+            'tuteeCourses.*' => ['string', 'exists:Courses,course_code'],
         ]);
 
         $tutorProfile = TutorProfile::firstOrCreate(
@@ -71,19 +68,15 @@ class ProfileApiController extends Controller
         $tutorProfile->bio = $validated['bio'] ?? '';
         $tutorProfile->save();
 
-        if (array_key_exists('tutorCourses', $validated)) {
-            $courseIds = Course::whereIn('course_code', $validated['tutorCourses'] ?? [])
+        if (array_key_exists('tuteeCourses', $validated)) {
+            $tuteeIds = Course::whereIn('course_code', $validated['tuteeCourses'] ?? [])
                 ->pluck('course_id')
                 ->toArray();
 
-            $topicIds = CourseTopic::whereIn('course_id', $courseIds)
-                ->pluck('topic_id')
-                ->toArray();
-
-            DB::table('Tutor_Expertise')->where('user_id', $user->user_id)->delete();
-            if (!empty($topicIds)) {
-                DB::table('Tutor_Expertise')->insert(
-                    array_map(fn($tid) => ['user_id' => $user->user_id, 'topic_id' => $tid], $topicIds)
+            DB::table('Tutee_Courses')->where('user_id', $user->user_id)->delete();
+            if (!empty($tuteeIds)) {
+                DB::table('Tutee_Courses')->insert(
+                    array_map(fn($cid) => ['user_id' => $user->user_id, 'course_id' => $cid], $tuteeIds)
                 );
             }
         }

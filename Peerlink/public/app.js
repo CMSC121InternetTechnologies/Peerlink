@@ -183,11 +183,15 @@ async function saveProfile(event) {
     const res = await fetch('/api/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ bio: userProfile.bio, tutorCourses: userProfile.tutorCourses }),
+      body: JSON.stringify({ 
+          bio: userProfile.bio, 
+          tutorCourses: userProfile.tutorCourses,
+          tuteeCourses: userProfile.tuteeCourses
+      }),
     });
     if (!res.ok) throw new Error();
     showToast('Profile saved!');
-    fetchProfile(); // refresh stats
+    fetchProfile();
   } catch {
     showToast('Failed to save profile.');
     return;

@@ -9,7 +9,7 @@ class TutorController extends Controller
 {
     public function index()
     {
-        $tutors = TutorProfile::with(['user', 'reviews', 'topics.course'])->get();
+        $tutors = TutorProfile::with(['user', 'reviews', 'courses'])->get();
 
         $formattedTutors = $tutors->map(function ($tutor) {
             
@@ -18,8 +18,8 @@ class TutorController extends Controller
             $reviewCount = $tutor->reviews->count();
             $rating = $reviewCount > 0 ? $tutor->reviews->avg('rating') : 0.0;
 
-            $courses = $tutor->topics->map(function($topic) {
-                return str_replace(' ', '', strtoupper($topic->course->course_code));
+            $courses = $tutor->courses->map(function($course) {
+                return str_replace(' ', '', strtoupper($course->course_code));
             })->unique()->values();
 
             return [
