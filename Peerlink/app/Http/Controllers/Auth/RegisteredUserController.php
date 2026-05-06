@@ -25,6 +25,7 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'contact_number' => ['required', 'string', 'regex:/^\+63[\s\-]?9\d{2}[\s\-]?\d{3}[\s\-]?\d{4}$/'],
             'program_code' => ['required', 'string', 'exists:Programs,program_code'],
@@ -36,6 +37,7 @@ class RegisteredUserController extends Controller
         $cleaned_contact = str_replace([' ', '-'], '', $request->contact_number);
         $user = User::create([
             'first_name' => $request->first_name,
+            'middle_name' => $request->middle_name,
             'last_name' => $request->last_name,
             'contact_number' => $cleaned_contact,
             'program_code' => $request->program_code,
