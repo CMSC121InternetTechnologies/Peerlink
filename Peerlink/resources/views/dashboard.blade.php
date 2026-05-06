@@ -279,7 +279,7 @@
             </div>
           </section>
 
-          <section class="profile-section">
+          <section class="profile-section" style="margin-top:2rem;">
             <h3>Password</h3>
             <button class="btn-outline" onclick="togglePasswordChange(true)" id="pwChangeTrigger" style="font-size:.85rem;padding:.4rem .9rem;">Change Password</button>
             <div id="passwordChangeForm" style="display:none;margin-top:1rem;">
