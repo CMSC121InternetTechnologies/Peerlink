@@ -39,9 +39,14 @@ class User extends Authenticatable
         ];
     }
 
-    public function getAuthPassword()
+    public function getAuthPassword(): string
     {
         return $this->password_hash;
+    }
+
+    public function getAuthPasswordName(): string
+    {
+        return 'password_hash';
     }
 
     // Disable "Remember Me" tokens as they do not exist in the database schema (for now)
