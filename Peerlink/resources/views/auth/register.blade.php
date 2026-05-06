@@ -31,13 +31,16 @@
                 <option value="" disabled selected>Select Program</option>
                 @foreach($programs as $program)
                     <option value="{{ $program->program_code }}" {{ old('program_code') == $program->program_code ? 'selected' : '' }}>
-                        {{ $program->program_code }}
+                        {{ $program->program_name }}
                     </option>
                 @endforeach
             </select>
 
             <label>Current Year Level (e.g., 1, 2, 3)</label>
             <input type="number" name="current_year_level" value="{{ old('current_year_level') }}" required min="1" max="100">
+            
+            <label>Contact Number (Format: +63 9xx-xxx-xxxx)</label>
+            <input type="text" name="contact_number" value="{{ old('contact_number') }}" required placeholder="+63 912-345-6789" style="width: 100%; margin-bottom: 0.5rem;">
 
             <label>Email Address</label>
             <input type="email" name="email" value="{{ old('email') }}" required>
