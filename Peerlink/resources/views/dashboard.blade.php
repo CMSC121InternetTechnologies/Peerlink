@@ -14,13 +14,15 @@
   <!-- Pass server data to JS -->
   <script>
     window.__onboarding = {{ $onboarding ? 'true' : 'false' }};
-    window.__courses = {!! json_encode($courses->map(function($c) {
-      return [
-        'code' => $c->course_code,
-        'name' => $c->course_name,
-        'topics' => $c->topics->pluck('topic_name')
-      ];
-    })->values()) !!};
+    window.__courses  = {!! json_encode($courses->map(fn($c) => ['code' => $c->course_code, 'name' => $c->course_name])->values()) !!};
+    window.__programs = {!! json_encode($programs->map(fn($p) => ['code' => $p->program_code])->values()) !!};
+    window.__authUser = {
+      firstName:  '{{ addslashes(auth()->user()->first_name) }}',
+      lastName:   '{{ addslashes(auth()->user()->last_name) }}',
+      programCode:'{{ auth()->user()->program_code }}',
+      yearLevel:  {{ auth()->user()->current_year_level ?? 'null' }},
+      contact:    '{{ addslashes(auth()->user()->contact_number ?? '') }}',
+    };
   </script>
 
   <!-- Navigation Bar -->
@@ -33,6 +35,7 @@
     <div class="nav-links">
       <a href="#" class="nav-link" id="navDashboard"   onclick="switchView('dashboard')">Explore Tutors</a>
       <a href="#" class="nav-link" id="navMyRequests"  onclick="switchView('myRequests')">My Requests</a>
+      <a href="#" class="nav-link" id="navMySessions"  onclick="switchView('mySessions')">My Sessions</a>
       <a href="#" class="nav-link" id="navProfile"     onclick="switchView('profile')">Profile</a>
     </div>
 
@@ -180,11 +183,44 @@
       <div id="myRequestsList" class="requests-list" style="max-width:720px;margin:0 auto;"></div>
     </div>
 
+    <!-- ===== MY SESSIONS VIEW ===== -->
+    <div id="mySessionsView" style="display:none;">
+      <div class="page-header">
+        <h1 class="page-title">My Sessions</h1>
+        <div class="filter-row">
+          <select id="sessionsFilter" onchange="renderSessions()" class="select-course" style="width:auto;min-width:160px;">
+            <option value="all">All</option>
+            <option value="Scheduled">Upcoming</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div id="mySessionsList" class="requests-list" style="max-width:720px;margin:0 auto;"></div>
+
+      <!-- Browse open group sessions (tutee only) -->
+      <div class="tutee-only" id="openSessionsSection" style="margin-top:2.5rem;padding-top:1.5rem;border-top:2px solid #e0d8c8;">
+        <div class="page-header" style="padding-top:0;margin-bottom:1rem;">
+          <h2 style="font-size:1.3rem;font-weight:600;margin:0;">Browse Open Group Sessions</h2>
+        </div>
+        <div id="openSessionsList" class="requests-list" style="max-width:720px;margin:0 auto;"></div>
+      </div>
+    </div>
+
     <!-- ===== PROFILE VIEW ===== -->
     <div id="profileView" class="profile-container">
       <div class="profile-card">
         <div class="profile-header-main">
-          <div class="tutor-avatar larger">{{ substr(auth()->user()->first_name,0,1) }}{{ substr(auth()->user()->last_name,0,1) }}</div>
+          <div class="profile-avatar-wrap">
+            <div class="tutor-avatar larger" id="profileAvatar">{{ substr(auth()->user()->first_name,0,1) }}{{ substr(auth()->user()->last_name,0,1) }}</div>
+            <label class="avatar-upload-label" title="Change photo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <input type="file" accept="image/*" id="photoInput" style="display:none;" onchange="handlePhotoSelect(this)">
+            </label>
+          </div>
           <div class="profile-meta">
             <h1 id="profileDisplayName">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</h1>
             <div class="role-badge" id="roleBadge"></div>
@@ -208,6 +244,64 @@
               <div id="tuteeCoursesDisplay" class="tutor-courses"></div>
             </section>
           </div>
+          <section class="profile-section">
+            <h3>Personal Info</h3>
+            <div class="personal-info-list">
+              <div class="personal-info-row"><span class="info-label">Program</span><span id="displayProgram">—</span></div>
+              <div class="personal-info-row"><span class="info-label">Year Level</span><span id="displayYearLevel">—</span></div>
+              <div class="personal-info-row"><span class="info-label">Contact</span><span id="displayContact">—</span></div>
+            </div>
+            <button class="btn-outline" onclick="togglePersonalEdit(true)" style="margin-top:.75rem;font-size:.85rem;padding:.4rem .9rem;">Edit Info</button>
+            <div id="personalEditForm" style="display:none;margin-top:1rem;">
+              <div class="course-edit-grid" style="margin-bottom:.75rem;">
+                <div class="input-group">
+                  <label>Program</label>
+                  <select id="programSelect" class="select-course">
+                    <option value="">— select —</option>
+                    @foreach($programs as $p)
+                      <option value="{{ $p->program_code }}">{{ $p->program_code }}</option>
+                    @endforeach
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label>Year Level</label>
+                  <input type="number" id="yearLevelInput" min="1" max="10" class="select-course" style="padding:.6rem .75rem;"/>
+                </div>
+              </div>
+              <div class="input-group" style="margin-bottom:.75rem;">
+                <label>Contact Number</label>
+                <input type="text" id="contactInput" placeholder="e.g. 09171234567" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
+              </div>
+              <div style="display:flex;gap:.75rem;">
+                <button class="btn-outline" onclick="togglePersonalEdit(false)">Cancel</button>
+                <button class="btn-primary" onclick="savePersonalInfo()">Save</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="profile-section">
+            <h3>Password</h3>
+            <button class="btn-outline" onclick="togglePasswordChange(true)" id="pwChangeTrigger" style="font-size:.85rem;padding:.4rem .9rem;">Change Password</button>
+            <div id="passwordChangeForm" style="display:none;margin-top:1rem;">
+              <div class="input-group" style="margin-bottom:.75rem;">
+                <label>Current Password</label>
+                <input type="password" id="currentPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
+              </div>
+              <div class="input-group" style="margin-bottom:.75rem;">
+                <label>New Password</label>
+                <input type="password" id="newPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
+              </div>
+              <div class="input-group" style="margin-bottom:.75rem;">
+                <label>Confirm New Password</label>
+                <input type="password" id="confirmPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
+              </div>
+              <div style="display:flex;gap:.75rem;">
+                <button class="btn-outline" onclick="togglePasswordChange(false)">Cancel</button>
+                <button class="btn-primary" onclick="changePassword()">Update Password</button>
+              </div>
+            </div>
+          </section>
+
           <div class="danger-zone">
             <h4>Danger Zone</h4>
             <p class="danger-text">This action is permanent and cannot be undone.</p>
@@ -265,13 +359,15 @@
       <p class="modal-sub"  id="modalSub"></p>
       <div class="modal-form">
         <label>Course</label>
-        <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;" onchange="updateSessionTopics()">
+        <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;" onchange="loadSessionTopics()">
           <option value="" disabled selected>Select a course</option>
         </select>
-        <label>Subject / Topic</label>
-        <select id="sessionTopic" class="select-course" style="margin-bottom:.75rem;">
-          <option value="" disabled selected>Select a course first</option>
-        </select>
+        <div id="sessionTopicsWrap" style="display:none;margin-bottom:.75rem;">
+          <label style="display:block;margin-bottom:.4rem;">Topics (optional)</label>
+          <div id="sessionTopicsList" style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem;background:var(--cream-dark);border-radius:var(--radius-sm);"></div>
+        </div>
+        <label>Additional Notes</label>
+        <input type="text" placeholder="e.g. Pointers in C, Recursion…" id="sessionTopic"/>
         <label>Preferred Schedule</label>
         <input type="datetime-local" id="sessionDate"/>
         <label>Message (optional)</label>
@@ -503,9 +599,49 @@
     </div>
   </div>
 
+  <!-- ===== ACCEPT SESSION MODAL (Phase 1.1) ===== -->
+  <div class="modal-overlay" id="acceptModalOverlay" onclick="closeAcceptModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeAcceptModal()">✕</button>
+      <h2 style="margin-bottom:.25rem;">Accept Session</h2>
+      <p id="acceptStudentName" style="color:var(--text-muted);margin-bottom:1rem;font-size:.9rem;"></p>
+      <input type="hidden" id="acceptRequestId"/>
+      <div class="modal-form">
+        <label>Scheduled Date &amp; Time</label>
+        <input type="datetime-local" id="acceptTime"/>
+        <label>Modality</label>
+        <select id="acceptModality" class="select-course" style="margin-bottom:.75rem;" onchange="toggleAcceptLink()">
+          <option value="In-Person">In-Person</option>
+          <option value="Online">Online</option>
+        </select>
+        <div id="acceptRoomWrap">
+          <label>Room</label>
+          <select id="acceptRoom" class="select-course" style="margin-bottom:.75rem;">
+            <option value="">— auto-assign —</option>
+          </select>
+        </div>
+        <div id="acceptLinkWrap" style="display:none;">
+          <label>Meeting Link</label>
+          <input type="url" id="acceptLink" placeholder="https://meet.google.com/…"/>
+        </div>
+        <button class="btn-primary full-width" onclick="submitAccept()" style="margin-top:1rem;">Confirm &amp; Accept</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TUTOR PROFILE DETAIL MODAL (Phase 3.1) ===== -->
+  <div class="modal-overlay" id="tutorProfileOverlay" onclick="closeTutorProfile()">
+    <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:600px;">
+      <button class="modal-close" onclick="closeTutorProfile()">✕</button>
+      <div id="tutorProfileContent">
+        <div style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
-  <script src="{{ asset('app.js') }}"></script>
+  <script src="{{ asset('app.js') }}?v={{ filemtime(public_path('app.js')) }}"></script>
 </body>
 </html>

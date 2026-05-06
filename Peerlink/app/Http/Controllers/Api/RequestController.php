@@ -10,6 +10,8 @@ use App\Models\TutoringRequest;
 use App\Models\TutoringSession;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class RequestController extends Controller
@@ -161,7 +163,7 @@ class RequestController extends Controller
         $req  = TutoringRequest::findOrFail($id);
 
         $validated = $request->validate([
-            'action'               => ['required', Rule::in(['accept', 'decline', 'claim', 'counter_propose', 'student_accept', 'student_decline'])],
+            'action'               => ['required', Rule::in(['accept', 'decline', 'claim', 'counter_propose', 'student_accept', 'student_decline', 'cancel'])],
             'modality'             => ['nullable', Rule::in(['In-Person', 'Online'])],
             'room_id'              => ['nullable', 'integer', 'exists:Rooms,room_id'],
             'meeting_link'         => ['nullable', 'string', 'max:500'],
@@ -210,7 +212,7 @@ class RequestController extends Controller
             $req->save();
 
             try {
-                TutoringSession::create([
+                $session = TutoringSession::create([
                     'request_id'     => $req->request_id,
                     'modality'       => $req->counter_proposed_modality ?? 'In-Person',
                     'room_id'        => $roomId,
@@ -218,6 +220,7 @@ class RequestController extends Controller
                     'scheduled_time' => $req->counter_proposed_time ?? now()->addDays(3)->format('Y-m-d H:i:s'),
                     'status'         => 'Scheduled',
                 ]);
+                $this->addParticipants($session->session_id, $req->tutor_id, $req->student_id);
             } catch (QueryException $e) {
                 return response()->json(['error' => 'A session already exists for this request.'], 422);
             }
@@ -234,6 +237,32 @@ class RequestController extends Controller
             }
 
             return response()->json(['message' => 'Counter-proposal accepted and session scheduled.']);
+        }
+
+        // --- Student cancels their own pending request ---
+        if ($action === 'cancel') {
+            if ($req->student_id !== $user->user_id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+            if (!in_array($req->status, ['Pending', 'CounterProposed'])) {
+                return response()->json(['error' => 'Only pending or counter-proposed requests can be cancelled.'], 422);
+            }
+
+            $req->status = 'Expired';
+            $req->save();
+
+            if ($req->tutor_id && $req->tutor_id !== $user->user_id) {
+                $studentName = $user->first_name . ' ' . $user->last_name;
+                Notification::create([
+                    'user_id'    => $req->tutor_id,
+                    'type'       => 'request_cancelled',
+                    'message'    => "{$studentName} cancelled their tutoring request for {$req->course?->course_code}.",
+                    'request_id' => $req->request_id,
+                    'is_read'    => false,
+                ]);
+            }
+
+            return response()->json(['message' => 'Request cancelled.']);
         }
 
         // --- Tutor-side actions ---
@@ -294,7 +323,7 @@ class RequestController extends Controller
             ?? 1;
 
         try {
-            TutoringSession::create([
+            $session = TutoringSession::create([
                 'request_id'     => $req->request_id,
                 'modality'       => $validated['modality'] ?? 'In-Person',
                 'room_id'        => $roomId,
@@ -302,6 +331,7 @@ class RequestController extends Controller
                 'scheduled_time' => $validated['scheduled_time'] ?? now()->addDays(3)->format('Y-m-d H:i:s'),
                 'status'         => 'Scheduled',
             ]);
+            $this->addParticipants($session->session_id, $user->user_id, $req->student_id);
         } catch (QueryException $e) {
             return response()->json(['error' => 'A session already exists for this request.'], 422);
         }
@@ -346,7 +376,7 @@ class RequestController extends Controller
             'status'     => 'Approved',
         ]);
 
-        TutoringSession::create([
+        $session = TutoringSession::create([
             'request_id'     => $req->request_id,
             'modality'       => $validated['modality'],
             'room_id'        => $roomId,
@@ -355,6 +385,43 @@ class RequestController extends Controller
             'status'         => 'Scheduled',
         ]);
 
-        return response()->json(['message' => 'Group session posted.'], 201);
+        // Tutor is the host; no student participant yet (students join later)
+        DB::table('Session_Participants')->insert([
+            'participation_id' => (string) Str::uuid(),
+            'session_id'       => $session->session_id,
+            'user_id'          => $user->user_id,
+            'role'             => 'Tutor',
+            'has_attended'     => null,
+            'joined_at'        => now(),
+        ]);
+
+        return response()->json(['message' => 'Group session posted.', 'session_id' => $session->session_id], 201);
+    }
+
+    private function addParticipants(string $sessionId, string $tutorId, string $studentId): void
+    {
+        $rows = [
+            [
+                'participation_id' => (string) Str::uuid(),
+                'session_id'       => $sessionId,
+                'user_id'          => $tutorId,
+                'role'             => 'Tutor',
+                'has_attended'     => null,
+                'joined_at'        => now(),
+            ],
+        ];
+
+        if ($studentId !== $tutorId) {
+            $rows[] = [
+                'participation_id' => (string) Str::uuid(),
+                'session_id'       => $sessionId,
+                'user_id'          => $studentId,
+                'role'             => 'Tutee',
+                'has_attended'     => null,
+                'joined_at'        => now(),
+            ];
+        }
+
+        DB::table('Session_Participants')->insert($rows);
     }
 }

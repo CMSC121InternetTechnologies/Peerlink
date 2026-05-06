@@ -61,34 +61,21 @@ class DatabaseSeeder extends Seeder
             ['topic_id' => 21, 'course_id' => 3,  'topic_name' => 'Introduction to Algorithms and Computational Thinking'],
         ]);
 
-        // ── Tutor Expertise ───────────────────────────────────────────────────
+        // ── Tutor Expertise (stored by course_id, not topic_id) ───────────────
         DB::table('Tutor_Expertise')->insert([
-            // Alex: all CMSC121 topics (1–9) + CMSC122 (14,15)
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 1],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 2],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 3],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 4],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 5],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 6],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 7],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 8],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 9],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 14],
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'topic_id' => 15],
-            // Maria: MATH18 (16,17) + STAT105 (18,19)
-            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'topic_id' => 16],
-            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'topic_id' => 17],
-            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'topic_id' => 18],
-            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'topic_id' => 19],
-            // Ramon: CMSC11 (10,11) + CMSC12 (12,13)
-            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'topic_id' => 10],
-            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'topic_id' => 11],
-            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'topic_id' => 12],
-            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'topic_id' => 13],
-            // Elena: CMSC13 (20)
-            ['user_id' => 'aaaa0007-0007-0007-0007-000000000007', 'topic_id' => 20],
-            // Francis: CMSC10 (21)
-            ['user_id' => 'aaaa0008-0008-0008-0008-000000000008', 'topic_id' => 21],
+            // Alex: CMSC121 (6), CMSC122 (7)
+            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'course_id' => 6],
+            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'course_id' => 7],
+            // Maria: MATH18 (22), STAT105 (33)
+            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'course_id' => 22],
+            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'course_id' => 33],
+            // Ramon: CMSC11 (4), CMSC12 (5)
+            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'course_id' => 4],
+            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'course_id' => 5],
+            // Elena: CMSC13 (12)
+            ['user_id' => 'aaaa0007-0007-0007-0007-000000000007', 'course_id' => 12],
+            // Francis: CMSC10 (3)
+            ['user_id' => 'aaaa0008-0008-0008-0008-000000000008', 'course_id' => 3],
         ]);
 
         // ── Requests ─────────────────────────────────────────────────────────
@@ -295,23 +282,8 @@ class DatabaseSeeder extends Seeder
             ],
         ]);
 
-        // ── Notifications ─────────────────────────────────────────────────────
-        DB::table('Notifications')->insert([
-            // Alex: received Bianca's request (R1) — UNREAD
-            ['notification_id' => 'noti0001-0001-0001-0001-000000000001', 'user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'type' => 'new_request',      'message' => 'Bianca Reyes sent you a tutoring request for CMSC121.',          'request_id' => 'rrrr0001-0001-0001-0001-000000000001', 'is_read' => 0, 'created_at' => '2026-05-05 09:00:05'],
-            // Carlo: Alex accepted R2 — READ
-            ['notification_id' => 'noti0002-0002-0002-0002-000000000002', 'user_id' => 'aaaa0005-0005-0005-0005-000000000005', 'type' => 'request_accepted', 'message' => 'Alex Santos accepted your tutoring request for CMSC122.',         'request_id' => 'rrrr0002-0002-0002-0002-000000000002', 'is_read' => 1, 'created_at' => '2026-05-04 10:05:05'],
-            // Diana: Maria accepted R3 — READ
-            ['notification_id' => 'noti0003-0003-0003-0003-000000000003', 'user_id' => 'aaaa0006-0006-0006-0006-000000000006', 'type' => 'request_accepted', 'message' => 'Maria Cruz accepted your tutoring request for MATH18.',           'request_id' => 'rrrr0003-0003-0003-0003-000000000003', 'is_read' => 1, 'created_at' => '2026-04-26 11:05:05'],
-            // Carlo: Maria declined R4 — READ
-            ['notification_id' => 'noti0004-0004-0004-0004-000000000004', 'user_id' => 'aaaa0005-0005-0005-0005-000000000005', 'type' => 'request_declined', 'message' => 'Maria Cruz declined your tutoring request for STAT105.',          'request_id' => 'rrrr0004-0004-0004-0004-000000000004', 'is_read' => 1, 'created_at' => '2026-04-30 14:00:05'],
-            // Bianca: Ramon counter-proposed R5 — UNREAD
-            ['notification_id' => 'noti0005-0005-0005-0005-000000000005', 'user_id' => 'aaaa0004-0004-0004-0004-000000000004', 'type' => 'counter_proposed',  'message' => 'Ramon dela Pena proposed a new schedule for your CMSC11 request.', 'request_id' => 'rrrr0005-0005-0005-0005-000000000005', 'is_read' => 0, 'created_at' => '2026-05-03 14:30:00'],
-            // Francis: Alex accepted the broadcast R8 — UNREAD
-            ['notification_id' => 'noti0006-0006-0006-0006-000000000006', 'user_id' => 'aaaa0008-0008-0008-0008-000000000008', 'type' => 'request_accepted', 'message' => 'Alex Santos accepted your tutoring request for CMSC121.',         'request_id' => 'rrrr0008-0008-0008-0008-000000000008', 'is_read' => 0, 'created_at' => '2026-05-01 09:05:05'],
-            // Alex: saw Francis's broadcast before claiming — READ
-            ['notification_id' => 'noti0007-0007-0007-0007-000000000007', 'user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'type' => 'new_request',      'message' => 'A broadcast request for CMSC121 from Francis Tan is available to claim.', 'request_id' => 'rrrr0008-0008-0008-0008-000000000008', 'is_read' => 1, 'created_at' => '2026-05-01 09:00:05'],
-        ]);
+        // Notifications are generated naturally by the application when users interact
+        // (send requests, accept, decline, counter-propose, etc.) — not seeded here.
 
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
