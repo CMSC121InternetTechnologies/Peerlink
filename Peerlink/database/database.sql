@@ -31,7 +31,7 @@ CREATE TABLE `Divisions` (
   `division_id` varchar(10) NOT NULL,
   `division_name` text NOT NULL,
   PRIMARY KEY (`division_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -58,7 +58,7 @@ CREATE TABLE `Programs` (
   PRIMARY KEY (`program_code`),
   KEY `division_id` (`division_id`),
   CONSTRAINT `Programs_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`) ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -121,7 +121,7 @@ CREATE TABLE `Courses` (
   PRIMARY KEY (`course_id`),
   KEY `division_id` (`division_id`),
   CONSTRAINT `Courses_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -148,7 +148,7 @@ CREATE TABLE `Course_Topics` (
   PRIMARY KEY (`topic_id`),
   KEY `course_id` (`course_id`),
   CONSTRAINT `Course_Topics_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -176,7 +176,7 @@ CREATE TABLE `Rooms` (
   `capacity` int(11) NOT NULL,
   PRIMARY KEY (`room_id`),
   UNIQUE KEY `room_code` (`room_code`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -228,7 +228,7 @@ CREATE TABLE `Tutor_Expertise` (
   KEY `topic_id` (`topic_id`),
   CONSTRAINT `Tutor_Expertise_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Tutor_Profiles` (`user_id`) ON DELETE CASCADE,
   CONSTRAINT `Tutor_Expertise_ibfk_2` FOREIGN KEY (`topic_id`) REFERENCES `Course_Topics` (`topic_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -255,7 +255,7 @@ CREATE TABLE `User_Photos` (
   PRIMARY KEY (`photo_id`),
   UNIQUE KEY `user_id` (`user_id`),
   CONSTRAINT `User_Photos_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -330,7 +330,7 @@ CREATE TABLE `Sessions` (
   KEY `room_id` (`room_id`),
   CONSTRAINT `Sessions_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE CASCADE,
   CONSTRAINT `Sessions_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `Rooms` (`room_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -361,7 +361,7 @@ CREATE TABLE `Session_Media` (
   KEY `uploader_id` (`uploader_id`),
   CONSTRAINT `Session_Media_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
   CONSTRAINT `Session_Media_ibfk_2` FOREIGN KEY (`uploader_id`) REFERENCES `Users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -393,7 +393,7 @@ CREATE TABLE `Session_Participants` (
   KEY `user_id` (`user_id`),
   CONSTRAINT `Session_Participants_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
   CONSTRAINT `Session_Participants_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -454,7 +454,7 @@ CREATE TABLE `Session_Topics` (
   KEY `topic_id` (`topic_id`),
   CONSTRAINT `Session_Topics_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
   CONSTRAINT `Session_Topics_ibfk_2` FOREIGN KEY (`topic_id`) REFERENCES `Course_Topics` (`topic_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -729,7 +729,6 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
-<<<<<<< HEAD
 --
 -- Table structure for table `Notifications`
 --
@@ -744,10 +743,8 @@ CREATE TABLE `Notifications` (
   `is_read` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`notification_id`),
-  KEY `user_id` (`user_id`),
-  KEY `request_id` (`request_id`),
-  CONSTRAINT `Notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE,
-  CONSTRAINT `Notifications_ibfk_2` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE SET NULL
+  KEY `idx_notif_user` (`user_id`),
+  KEY `idx_notif_request` (`request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 LOCK TABLES `Notifications` WRITE;
@@ -756,6 +753,3 @@ LOCK TABLES `Notifications` WRITE;
 UNLOCK TABLES;
 
 -- Dump completed on 2026-05-05 13:28:47
-=======
--- Dump completed on 2026-05-05 13:28:47
->>>>>>> 4a3087d722830627b6c1b9470aad1c7222af29d2
