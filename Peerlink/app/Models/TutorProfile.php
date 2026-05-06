@@ -9,6 +9,7 @@ class TutorProfile extends Model
     public $incrementing = false;
     protected $keyType = 'string';
     public $timestamps = false;
+    protected $fillable = ['user_id', 'bio', 'rating_avg'];
 
     public function user()
     {
@@ -20,8 +21,8 @@ class TutorProfile extends Model
         return $this->hasMany(SessionReview::class, 'reviewee_id', 'user_id');
     }
 
-    public function topics()
+    public function courses()
     {
-        return $this->belongsToMany(CourseTopic::class, 'Tutor_Expertise', 'user_id', 'topic_id');
+        return $this->belongsToMany(Course::class, 'Tutor_Expertise', 'user_id', 'course_id');
     }
 }

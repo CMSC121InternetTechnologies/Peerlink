@@ -38,4 +38,16 @@ class TutoringSession extends Model
     {
         return $this->hasMany(SessionReview::class, 'session_id', 'session_id');
     }
+
+    public function participantUsers()
+    {
+        return $this->belongsToMany(
+            \App\Models\User::class,
+            'Session_Participants',
+            'session_id',
+            'user_id',
+            'session_id',
+            'user_id'
+        )->withPivot('role', 'has_attended', 'joined_at', 'participation_id');
+    }
 }

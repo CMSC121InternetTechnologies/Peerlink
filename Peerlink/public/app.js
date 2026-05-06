@@ -31,6 +31,7 @@ let selectedTutor = null;
 let dropdownOpen = false;
 let notifDropdownOpen = false;
 let myRequestsData = [];
+let myIncomingRequests = [];
 let broadcastRequests = [];
 let pendingRequests = [];
 let availableRooms = [];
@@ -102,7 +103,11 @@ function switchView(view) {
   const navMap = { dashboard: 'navDashboard', myRequests: 'navMyRequests', profile: 'navProfile' };
   if (navMap[view]) document.getElementById(navMap[view]).classList.add('active');
 
-  if (view === 'myRequests') fetchMyRequests();
+  if (view === 'myRequests') {
+    const f = document.getElementById('myRequestsFilter');
+    if (f) f.value = 'all';
+    fetchMyRequests();
+  }
 }
 
 // ===== MODE TOGGLE =====
@@ -117,6 +122,7 @@ function setMode(mode) {
     badge.textContent = 'TUTEE PROFILE';
     badge.style.background = 'var(--coral)';
   }
+  if (currentView === 'myRequests') renderMyRequests();
 }
 
 // ===== PROFILE =====
@@ -353,7 +359,10 @@ async function submitRequest() {
   const date       = document.getElementById('sessionDate').value;
   const message    = document.getElementById('sessionMessage').value.trim();
 
-  if (!courseCode || !topic || !date) { showToast('Please fill out all required fields.'); return; }
+  if (!courseCode || !date) { showToast('Please select a course and preferred schedule.'); return; }
+
+  const tutorName = selectedTutor?.name || 'tutor';
+  const tutorId   = selectedTutor?.id || null;
 
   try {
     const res = await fetch('/api/requests', {
@@ -361,14 +370,19 @@ async function submitRequest() {
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
       body: JSON.stringify({
         course_code:    courseCode,
-        tutor_id:       selectedTutor?.id,
-        message:        topic + (message ? '\n' + message : ''),
+        tutor_id:       tutorId,
+        message:        (topic ? topic + (message ? '\n' + message : '') : message) || null,
         preferred_date: date,
       }),
     });
-    if (!res.ok) throw new Error();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.message || 'Failed to send request.');
+      return;
+    }
     closeSessionModal();
-    showToast(`Request sent to ${selectedTutor?.name}!`);
+    showToast(`Request sent to ${tutorName}!`);
+    fetchMyRequests();
   } catch {
     showToast('Failed to send request. Please try again.');
   }
@@ -616,15 +630,28 @@ async function submitGroupSession() {
 
 // ===== MY REQUESTS VIEW (US_10 + US_11 student + US_16) =====
 async function fetchMyRequests() {
+  const list = document.getElementById('myRequestsList');
+  if (list) list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">Loading…</p>';
   try {
-    const res = await fetch('/api/requests?role=student');
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    myRequestsData = data.requests || [];
-  } catch {
+    const [sRes, tRes] = await Promise.all([
+      fetch('/api/requests?role=student'),
+      fetch('/api/requests?role=tutor'),
+    ]);
+    myRequestsData     = sRes.ok ? ((await sRes.json()).requests || []) : [];
+    myIncomingRequests = tRes.ok ? ((await tRes.json()).requests || []) : [];
+  } catch (err) {
     myRequestsData = [];
+    myIncomingRequests = [];
+    console.error('fetchMyRequests failed:', err);
+    if (list) list.innerHTML = `<p style="text-align:center;color:var(--coral);padding:2rem 0;">Failed to load requests (${err.message}). Try refreshing.</p>`;
+    return;
   }
-  renderMyRequests();
+  try {
+    renderMyRequests();
+  } catch (err) {
+    console.error('renderMyRequests failed:', err);
+    if (list) list.innerHTML = '<p style="text-align:center;color:var(--coral);padding:2rem 0;">Failed to display requests.</p>';
+  }
 }
 
 function renderMyRequests() {
@@ -894,3 +921,743 @@ async function obFinish() {
   document.getElementById('onboardingOverlay').style.display = 'none';
   showToast('Welcome to PeerLink!');
 }
+
+// ===== UPDATED: switchView handles mySessions =====
+const _origSwitchView = switchView;
+switchView = function(view) {
+  currentView = view;
+  const views = { dashboardView: 'dashboard', myRequestsView: 'myRequests', mySessionsView: 'mySessions', profileView: 'profile' };
+  Object.keys(views).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (views[id] === view) ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  const navMap = { dashboard: 'navDashboard', myRequests: 'navMyRequests', mySessions: 'navMySessions', profile: 'navProfile' };
+  if (navMap[view]) { const el = document.getElementById(navMap[view]); if (el) el.classList.add('active'); }
+
+  if (view === 'myRequests') {
+    const f = document.getElementById('myRequestsFilter');
+    if (f) f.value = 'all';
+    fetchMyRequests();
+  }
+  if (view === 'mySessions') { fetchSessions(); fetchOpenSessions(); }
+  if (view === 'profile')    loadPersonalInfo();
+};
+
+// ===== UPDATED: fetchProfile loads photo and personal info =====
+const _origFetchProfile = fetchProfile;
+fetchProfile = async function() {
+  try {
+    const res = await fetch('/api/profile');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    userProfile.bio          = data.bio || '';
+    userProfile.tutorCourses = data.tutorCourses || [];
+    availableRooms           = data.rooms || [];
+
+    updateProfileDisplay();
+    populateGroupRoomSelect();
+    populateAcceptRoomSelect();
+
+    document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
+    document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
+    document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
+
+    if (data.photoUrl) displayAvatar(data.photoUrl);
+    if (data.programCode) document.getElementById('displayProgram').textContent = data.programCode;
+    if (data.yearLevel)   document.getElementById('displayYearLevel').textContent = data.yearLevel;
+    if (data.contactNumber) document.getElementById('displayContact').textContent = data.contactNumber;
+    else document.getElementById('displayContact').textContent = '—';
+  } catch { /* silently fail */ }
+};
+
+// ===== PROFILE PHOTO =====
+function displayAvatar(url) {
+  const el = document.getElementById('profileAvatar');
+  if (!el || !url) return;
+  el.style.backgroundImage = `url(${url})`;
+  el.style.backgroundSize  = 'cover';
+  el.style.backgroundPosition = 'center';
+  el.style.color = 'transparent';
+  el.style.fontSize = '0';
+}
+
+async function handlePhotoSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { showToast('Photo must be under 2MB.'); input.value = ''; return; }
+
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const dataUrl = e.target.result;
+    displayAvatar(dataUrl);
+    try {
+      const res = await fetch('/api/user/photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+        body: JSON.stringify({ photo: dataUrl }),
+      });
+      if (!res.ok) throw new Error();
+      showToast('Photo updated!');
+    } catch { showToast('Failed to upload photo.'); }
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== PERSONAL INFO =====
+function loadPersonalInfo() {
+  const u = window.__authUser || {};
+  const programEl = document.getElementById('displayProgram');
+  const yearEl    = document.getElementById('displayYearLevel');
+  const contactEl = document.getElementById('displayContact');
+  if (programEl) programEl.textContent = u.programCode || '—';
+  if (yearEl)    yearEl.textContent    = u.yearLevel   || '—';
+  if (contactEl) contactEl.textContent = u.contact     || '—';
+}
+
+function togglePersonalEdit(show) {
+  document.getElementById('personalEditForm').style.display = show ? 'block' : 'none';
+  const trigger = document.querySelector('[onclick="togglePersonalEdit(true)"]');
+  if (trigger) trigger.style.display = show ? 'none' : 'inline-flex';
+  if (show) {
+    const u = window.__authUser || {};
+    const ps = document.getElementById('programSelect');
+    if (ps) ps.value = u.programCode || '';
+    const yl = document.getElementById('yearLevelInput');
+    if (yl) yl.value = u.yearLevel || '';
+    const ci = document.getElementById('contactInput');
+    if (ci) ci.value = u.contact || '';
+  }
+}
+
+async function savePersonalInfo() {
+  const programCode  = document.getElementById('programSelect').value;
+  const yearLevel    = parseInt(document.getElementById('yearLevelInput').value);
+  const contactNumber = document.getElementById('contactInput').value.trim();
+
+  if (!programCode || !yearLevel) { showToast('Please fill in all required fields.'); return; }
+
+  try {
+    const res = await fetch('/api/user/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ program_code: programCode, current_year_level: yearLevel, contact_number: contactNumber || null }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.message || 'Update failed.');
+      return;
+    }
+    window.__authUser = { ...(window.__authUser || {}), programCode, yearLevel, contact: contactNumber };
+    document.getElementById('displayProgram').textContent   = programCode;
+    document.getElementById('displayYearLevel').textContent = yearLevel;
+    document.getElementById('displayContact').textContent   = contactNumber || '—';
+    togglePersonalEdit(false);
+    showToast('Personal info updated!');
+  } catch { showToast('Failed to update personal info.'); }
+}
+
+// ===== PASSWORD CHANGE =====
+function togglePasswordChange(show) {
+  document.getElementById('passwordChangeForm').style.display = show ? 'block' : 'none';
+  const trigger = document.getElementById('pwChangeTrigger');
+  if (trigger) trigger.style.display = show ? 'none' : 'inline-flex';
+  if (!show) {
+    ['currentPassword','newPassword','confirmPassword'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+  }
+}
+
+async function changePassword() {
+  const current  = document.getElementById('currentPassword').value;
+  const newPw    = document.getElementById('newPassword').value;
+  const confirm  = document.getElementById('confirmPassword').value;
+
+  if (!current || !newPw || !confirm) { showToast('Please fill in all password fields.'); return; }
+  if (newPw !== confirm) { showToast('New passwords do not match.'); return; }
+  if (newPw.length < 8)  { showToast('Password must be at least 8 characters.'); return; }
+
+  try {
+    const res = await fetch('/api/user/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ current_password: current, password: newPw, password_confirmation: confirm }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Failed to change password.');
+      return;
+    }
+    togglePasswordChange(false);
+    showToast('Password changed successfully!');
+  } catch { showToast('Failed to change password.'); }
+}
+
+// ===== PHASE 1.1: ACCEPT MODAL =====
+function populateAcceptRoomSelect() {
+  const sel = document.getElementById('acceptRoom');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— auto-assign —</option>' +
+    availableRooms.map(r => `<option value="${r.room_id}">${esc(r.room_name)} (${r.room_type})</option>`).join('');
+}
+
+function openAcceptModal(req) {
+  document.getElementById('acceptRequestId').value  = req.id;
+  document.getElementById('acceptStudentName').textContent = `Student: ${req.tuteeName}${req.course ? ' — ' + req.course : ''}`;
+  document.getElementById('acceptModality').value   = 'In-Person';
+  document.getElementById('acceptLink').value       = '';
+  document.getElementById('acceptRoomWrap').style.display  = 'block';
+  document.getElementById('acceptLinkWrap').style.display  = 'none';
+
+  // Pre-fill datetime from preferred date embedded in message
+  let prefTime = '';
+  if (req.message) {
+    const m = req.message.match(/\[Preferred:\s*([^\]]+)\]/);
+    if (m) prefTime = m[1].trim();
+  }
+  document.getElementById('acceptTime').value = prefTime;
+  populateAcceptRoomSelect();
+  document.getElementById('acceptModalOverlay').classList.add('open');
+}
+
+function closeAcceptModal() {
+  document.getElementById('acceptModalOverlay').classList.remove('open');
+}
+
+function toggleAcceptLink() {
+  const modality = document.getElementById('acceptModality').value;
+  document.getElementById('acceptRoomWrap').style.display = modality === 'In-Person' ? 'block' : 'none';
+  document.getElementById('acceptLinkWrap').style.display = modality === 'Online'    ? 'block' : 'none';
+}
+
+async function submitAccept() {
+  const requestId    = document.getElementById('acceptRequestId').value;
+  const scheduledTime = document.getElementById('acceptTime').value;
+  const modality     = document.getElementById('acceptModality').value;
+  const roomId       = document.getElementById('acceptRoom').value || null;
+  const meetingLink  = document.getElementById('acceptLink').value.trim() || null;
+
+  if (!scheduledTime) { showToast('Please select a date and time.'); return; }
+  if (modality === 'Online' && !meetingLink) { showToast('Please provide a meeting link for online sessions.'); return; }
+
+  try {
+    const res = await fetch(`/api/requests/${requestId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({
+        action:         'accept',
+        scheduled_time: scheduledTime,
+        modality,
+        room_id:        roomId ? parseInt(roomId) : null,
+        meeting_link:   meetingLink,
+      }),
+    });
+    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Accept failed.'); return; }
+    closeAcceptModal();
+    pendingRequests = pendingRequests.filter(r => r.id !== requestId);
+    renderTutorRequests();
+    showToast('Session accepted and scheduled!');
+    fetchProfile();
+    fetchMyRequests();
+    if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
+  } catch { showToast('Failed to accept request.'); }
+}
+
+// Patch respondTutorRequest to open accept modal instead of sending directly
+const _origRespond = respondTutorRequest;
+respondTutorRequest = async function(id, action) {
+  if (action === 'accept') {
+    const req = pendingRequests.find(r => r.id === id);
+    if (req) { openAcceptModal(req); return; }
+  }
+  return _origRespond(id, action);
+};
+
+// ===== PHASE 2.1: MY SESSIONS =====
+let mySessions = [];
+
+async function fetchSessions() {
+  try {
+    const res = await fetch('/api/sessions');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    mySessions = data.sessions || [];
+  } catch { mySessions = []; }
+  renderSessions();
+}
+
+function renderSessions() {
+  const filter = document.getElementById('sessionsFilter')?.value || 'all';
+  const list   = document.getElementById('mySessionsList');
+  if (!list) return;
+  const shown  = filter === 'all' ? mySessions : mySessions.filter(s => s.status === filter);
+
+  if (!shown.length) {
+    list.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">No sessions found.</p>`;
+    return;
+  }
+
+  list.innerHTML = shown.map(s => {
+    const dateStr = s.scheduledTime
+      ? new Date(s.scheduledTime).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—';
+    const statusColor = { Scheduled:'var(--teal)', Completed:'#4caf50', Cancelled:'var(--coral)' };
+    const color = statusColor[s.status] || '#aaa';
+
+    const partnerLabel = s.isGroup
+      ? (s.myRole === 'Tutor' ? `Group (${s.tuteeCount} joined)` : `Group session`)
+      : (s.partnerName || '—');
+
+    let actionsHtml = '';
+    if (s.myRole === 'Tutor' && s.status === 'Scheduled') {
+      actionsHtml = `
+        <div class="request-actions" style="margin-top:.75rem;">
+          <button class="btn-accept"  onclick="completeSession('${esc(s.session_id)}')">Mark Complete</button>
+          <button class="btn-decline" onclick="cancelSession('${esc(s.session_id)}')">Cancel Session</button>
+        </div>`;
+    }
+    if (s.canReview) {
+      actionsHtml += `
+        <div style="margin-top:.5rem;">
+          <button class="btn-outline" style="font-size:.85rem;padding:.4rem .9rem;"
+            onclick="openReviewModal('${esc(s.session_id)}','${esc(s.tutorId)}','${esc(s.partnerName)}')">★ Leave Review</button>
+        </div>`;
+    }
+
+    // Attendee list for tutor group sessions
+    let attendeesHtml = '';
+    if (s.myRole === 'Tutor' && s.isGroup && s.tuteeCount > 0) {
+      attendeesHtml = `<div style="font-size:.82rem;color:var(--text-muted);margin-top:.25rem;">${s.tuteeCount} student${s.tuteeCount !== 1 ? 's' : ''} joined</div>`;
+    }
+
+    return `
+      <div class="request-card">
+        <div class="request-header">
+          <div class="request-tutee">${esc(s.course || '—')} &mdash; ${esc(partnerLabel)}</div>
+          <span class="course-badge" style="margin:0;background:${color};color:white;">${esc(s.status)}</span>
+        </div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-top:.25rem;">
+          ${s.myRole === 'Tutor' ? '📋 Tutor' : '📖 Student'}
+          &nbsp;|&nbsp; ${esc(s.modality || '')}
+          ${s.room ? '@ ' + esc(s.room) : ''}
+          ${s.meetingLink ? `<a href="${esc(s.meetingLink)}" target="_blank" rel="noopener" style="color:var(--purple);">🔗 Join</a>` : ''}
+        </div>
+        <div class="request-date">🗓 ${dateStr}</div>
+        ${attendeesHtml}
+        ${actionsHtml}
+      </div>`;
+  }).join('');
+}
+
+async function completeSession(id) {
+  if (!confirm('Mark this session as completed?')) return;
+  try {
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ action: 'complete' }),
+    });
+    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+    showToast('Session marked as completed!');
+    fetchSessions();
+    fetchProfile();
+  } catch { showToast('Action failed.'); }
+}
+
+async function cancelSession(id) {
+  if (!confirm('Cancel this session? All participants will be notified.')) return;
+  try {
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ action: 'cancel' }),
+    });
+    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+    showToast('Session cancelled.');
+    fetchSessions();
+  } catch { showToast('Action failed.'); }
+}
+
+// ===== PHASE 2.2: BROWSE OPEN GROUP SESSIONS =====
+let openSessions = [];
+
+async function fetchOpenSessions() {
+  try {
+    const res = await fetch('/api/sessions/open');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    openSessions = data.sessions || [];
+  } catch { openSessions = []; }
+  renderOpenSessions();
+}
+
+function renderOpenSessions() {
+  const list = document.getElementById('openSessionsList');
+  if (!list) return;
+
+  if (!openSessions.length) {
+    list.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">No open group sessions right now.</p>`;
+    return;
+  }
+
+  list.innerHTML = openSessions.map(s => {
+    const dateStr = new Date(s.scheduledTime).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    const spots   = s.capacity - s.tuteeCount;
+    return `
+      <div class="request-card">
+        <div class="request-header">
+          <div class="request-tutee">${esc(s.course || '—')} &mdash; ${esc(s.tutorName)}</div>
+          <span class="course-badge" style="margin:0;background:var(--purple);color:white;">${s.tuteeCount}/${s.capacity} joined</span>
+        </div>
+        ${s.message ? `<div class="request-msg" style="margin-top:.35rem;">${esc(s.message)}</div>` : ''}
+        <div class="request-date">🗓 ${dateStr} &nbsp;|&nbsp; ${esc(s.modality)}${s.room ? ' @ ' + esc(s.room) : ''}</div>
+        <div class="request-actions" style="margin-top:.75rem;">
+          ${s.alreadyJoined
+            ? `<span style="color:var(--teal);font-size:.875rem;font-weight:500;">✓ Already joined</span>`
+            : s.full
+              ? `<span style="color:#aaa;font-size:.875rem;">Session full</span>`
+              : `<button class="btn-accept" onclick="joinSession('${esc(s.session_id)}')">Join Session</button>`
+          }
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function joinSession(id) {
+  try {
+    const res = await fetch(`/api/sessions/${id}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+    });
+    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed to join.'); return; }
+    showToast('You have joined the session!');
+    fetchOpenSessions();
+    fetchSessions();
+  } catch { showToast('Failed to join session.'); }
+}
+
+// ===== PHASE 2.3: CANCEL REQUEST =====
+async function cancelRequest(id) {
+  if (!confirm('Cancel this request?')) return;
+  try {
+    const res = await fetch(`/api/requests/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ action: 'cancel' }),
+    });
+    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+    showToast('Request cancelled.');
+    fetchMyRequests();
+  } catch { showToast('Failed to cancel request.'); }
+}
+
+async function declineIncomingRequest(id) {
+  if (!confirm('Decline this request?')) return;
+  try {
+    const res = await fetch(`/api/requests/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ action: 'decline' }),
+    });
+    if (!res.ok) { const e = await res.json(); showToast(e.error || 'Failed.'); return; }
+    showToast('Request declined.');
+    fetchMyRequests();
+  } catch { showToast('Failed to decline request.'); }
+}
+
+function openAcceptFromMyRequests(id) {
+  const req = myIncomingRequests.find(r => r.id === id);
+  if (!req) return;
+  openAcceptModal(req);
+}
+
+// Override renderMyRequests — mode-aware: tutor toggle → incoming, tutee toggle → sent
+renderMyRequests = function() {
+  const list      = document.getElementById('myRequestsList');
+  const filterRow = document.querySelector('#myRequestsView .filter-row');
+
+  if (currentMode === 'tutor') {
+    if (filterRow) filterRow.style.display = 'none';
+
+    if (!myIncomingRequests.length) {
+      list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">No pending requests from students.</p>';
+      return;
+    }
+
+    list.innerHTML = `
+      <h3 style="font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;">Incoming from Students</h3>
+      ${myIncomingRequests.map(req => {
+        const dateStr = req.date ? new Date(req.date).toLocaleDateString() : '';
+        const msg = req.message ? req.message.replace(/^\[Preferred:[^\]]*\]\s*/, '') : '';
+        return `
+          <div class="request-card" style="border-left:3px solid var(--teal);">
+            <div class="request-header">
+              <div class="request-tutee">${esc(req.course || '—')} &mdash; ${esc(req.tuteeName || 'Student')}</div>
+              <span class="course-badge" style="margin:0;background:var(--teal);color:white;">Pending</span>
+            </div>
+            ${msg ? `<div class="request-msg" style="margin-top:.5rem;">"${esc(msg)}"</div>` : ''}
+            <div class="request-date" style="margin-top:.25rem;">Received: ${dateStr}</div>
+            <div class="request-actions" style="margin-top:.75rem;">
+              <button class="btn-accept"  onclick="openAcceptFromMyRequests('${esc(req.id)}')">Accept</button>
+              <button class="btn-decline" onclick="declineIncomingRequest('${esc(req.id)}')">Decline</button>
+            </div>
+          </div>`;
+      }).join('')}`;
+    return;
+  }
+
+  // ── Tutee mode: sent requests ──────────────────────────────────────────
+  if (filterRow) filterRow.style.display = '';
+
+  const filter = document.getElementById('myRequestsFilter').value;
+  const shown  = filter === 'all' ? myRequestsData : myRequestsData.filter(r => r.status === filter);
+
+  if (!shown.length) {
+    list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">No requests found.</p>';
+    return;
+  }
+
+  const statusColor = {
+    Pending:         'var(--teal)',
+    Approved:        '#4caf50',
+    Declined:        'var(--coral)',
+    Expired:         '#aaa',
+    CounterProposed: 'var(--purple)',
+  };
+
+  list.innerHTML = `
+    <h3 style="font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.75rem;">Requests I Sent</h3>
+    ${shown.map(req => {
+      const color     = statusColor[req.status] || '#aaa';
+      const createdAt = req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '';
+
+      let counterHtml = '';
+      if (req.status === 'CounterProposed' && req.counterProposal) {
+        const cp     = req.counterProposal;
+        const cpDate = cp.proposedTime
+          ? new Date(cp.proposedTime).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+          : '—';
+        counterHtml = `
+          <div class="counter-proposal-box">
+            <strong>Tutor proposes:</strong>
+            <div>🗓 ${cpDate}${cp.modality ? ' &nbsp;|&nbsp; ' + esc(cp.modality) : ''}${cp.room ? ' @ ' + esc(cp.room) : ''}</div>
+            ${cp.message ? `<div style="font-style:italic;margin-top:.25rem;">"${esc(cp.message)}"</div>` : ''}
+            <div class="request-actions" style="margin-top:.75rem;">
+              <button class="btn-accept"  onclick="respondToCounter('${esc(req.id)}','student_accept')">Accept</button>
+              <button class="btn-decline" onclick="respondToCounter('${esc(req.id)}','student_decline')">Decline</button>
+            </div>
+          </div>`;
+      }
+
+      let sessionHtml = '';
+      if (req.session) {
+        const sDate = req.session.scheduledTime
+          ? new Date(req.session.scheduledTime).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+          : '—';
+        sessionHtml = `
+          <div class="session-details-box">
+            <strong>Session:</strong> ${esc(req.session.modality || '')}
+            ${req.session.room ? '@ ' + esc(req.session.room) : ''} &nbsp;|&nbsp; 🗓 ${sDate}
+            ${!req.session.hasReview && req.tutorId
+              ? `<button class="btn-outline"
+                  style="margin-left:.5rem;padding:.3rem .8rem;font-size:.8rem;"
+                  onclick="openReviewModal('${esc(req.session.session_id)}','${esc(req.tutorId)}','${esc(req.tutorName)}')">
+                  ★ Leave Review
+                </button>`
+              : ''}
+            ${req.session.hasReview ? `<span style="color:#aaa;margin-left:.5rem;font-size:.85rem;">Reviewed ✓</span>` : ''}
+          </div>`;
+      }
+
+      const canCancel = req.status === 'Pending' || req.status === 'CounterProposed';
+      const cancelBtn = canCancel
+        ? `<div style="margin-top:.5rem;">
+             <button class="btn-outline" style="font-size:.8rem;padding:.3rem .7rem;color:var(--coral);border-color:var(--coral);"
+               onclick="cancelRequest('${esc(req.id)}')">Cancel Request</button>
+           </div>`
+        : '';
+
+      return `
+        <div class="request-card">
+          <div class="request-header">
+            <div class="request-tutee">${esc(req.course || '—')} &mdash; ${esc(req.tutorName || 'Broadcast')}</div>
+            <span class="course-badge" style="margin:0;background:${color};color:white;">${esc(req.status)}</span>
+          </div>
+          ${req.message ? `<div class="request-msg" style="margin-top:.5rem;">"${esc(req.message)}"</div>` : ''}
+          <div class="request-date" style="margin-top:.25rem;">Sent: ${createdAt}</div>
+          ${counterHtml}
+          ${sessionHtml}
+          ${cancelBtn}
+        </div>`;
+    }).join('')}`;
+};
+
+// ===== PHASE 3.1: TUTOR PROFILE DETAIL MODAL =====
+async function openTutorProfile(id) {
+  document.getElementById('tutorProfileOverlay').classList.add('open');
+  document.getElementById('tutorProfileContent').innerHTML =
+    '<div style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</div>';
+
+  try {
+    const res = await fetch(`/api/tutors/${id}`);
+    if (!res.ok) throw new Error();
+    const t = await res.json();
+
+    const stars = n => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
+    const courseBadges = (t.courses || []).map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
+    const reviewsHtml = (t.reviews || []).length
+      ? (t.reviews || []).map(r => `
+          <div style="border-top:1px solid #e0d8c8;padding:.75rem 0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:#f5a623;font-size:1rem;">${stars(r.rating)}</span>
+              <span style="font-size:.8rem;color:var(--text-muted);">${r.reviewerName}</span>
+            </div>
+            ${r.feedback ? `<p style="margin:.35rem 0 0;font-size:.875rem;">${esc(r.feedback)}</p>` : ''}
+          </div>`).join('')
+      : '<p style="color:var(--text-muted);font-size:.875rem;">No reviews yet.</p>';
+
+    document.getElementById('tutorProfileContent').innerHTML = `
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;">
+        <div class="tutor-avatar" style="width:64px;height:64px;font-size:1.4rem;">${esc(t.initials)}</div>
+        <div>
+          <h2 style="margin:0 0 .2rem;">${esc(t.name)}</h2>
+          <div style="color:var(--text-muted);font-size:.875rem;">${esc(t.degree)}</div>
+          <div style="margin-top:.2rem;">
+            <span style="color:#f5a623;">${stars(t.rating)}</span>
+            <span style="font-size:.8rem;color:var(--text-muted);margin-left:.3rem;">${(t.rating || 0).toFixed(1)} (${t.reviewCount} reviews)</span>
+          </div>
+        </div>
+      </div>
+      ${t.bio ? `<p style="margin-bottom:1rem;color:var(--text-muted);line-height:1.6;">${esc(t.bio)}</p>` : ''}
+      <div style="margin-bottom:1rem;">
+        <strong style="font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">Courses</strong>
+        <div style="margin-top:.4rem;">${courseBadges || '<span style="color:var(--text-muted);">None listed</span>'}</div>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <strong style="font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">Reviews</strong>
+        ${reviewsHtml}
+      </div>
+      <button class="btn-primary full-width" onclick="closeTutorProfile(); openSessionModal('${esc(t.id)}')">Request Session</button>
+    `;
+  } catch {
+    document.getElementById('tutorProfileContent').innerHTML =
+      '<p style="text-align:center;color:var(--coral);padding:2rem;">Failed to load profile.</p>';
+  }
+}
+
+function closeTutorProfile() {
+  document.getElementById('tutorProfileOverlay').classList.remove('open');
+}
+
+// ===== PHASE 3.2: COURSE TOPIC PICKER IN REQUEST MODAL =====
+async function loadSessionTopics() {
+  const code = document.getElementById('sessionCourse').value;
+  const wrap = document.getElementById('sessionTopicsWrap');
+  const listEl = document.getElementById('sessionTopicsList');
+  if (!code) { wrap.style.display = 'none'; return; }
+
+  try {
+    const res = await fetch(`/api/courses/${encodeURIComponent(code)}/topics`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const topics = data.topics || [];
+    if (!topics.length) { wrap.style.display = 'none'; return; }
+    listEl.innerHTML = topics.map(t => `
+      <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.82rem;background:white;padding:.25rem .6rem;border-radius:20px;border:1px solid #d0c8b8;">
+        <input type="checkbox" value="${esc(t.topic_name)}" style="accent-color:var(--purple);">
+        ${esc(t.topic_name)}
+      </label>`).join('');
+    wrap.style.display = 'block';
+  } catch {
+    wrap.style.display = 'none';
+  }
+}
+
+// Patch submitRequest to include selected topics (topics are optional)
+const _origSubmitRequest = submitRequest;
+submitRequest = async function() {
+  const courseCode = document.getElementById('sessionCourse').value;
+  const date       = document.getElementById('sessionDate').value;
+  const message    = document.getElementById('sessionMessage').value.trim();
+
+  const checkedTopics = Array.from(
+    document.querySelectorAll('#sessionTopicsList input[type=checkbox]:checked')
+  ).map(cb => cb.value);
+
+  let topicField = document.getElementById('sessionTopic').value.trim();
+  if (checkedTopics.length) {
+    topicField = checkedTopics.join(', ') + (topicField ? '; ' + topicField : '');
+    document.getElementById('sessionTopic').value = topicField;
+  }
+
+  if (!courseCode || !date) { showToast('Please select a course and preferred schedule.'); return; }
+
+  const tutorName = selectedTutor?.name || 'tutor';
+  const tutorId   = selectedTutor?.id || null;
+
+  try {
+    const res = await fetch('/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({
+        course_code:    courseCode,
+        tutor_id:       tutorId,
+        message:        (topicField ? topicField + (message ? '\n' + message : '') : message) || null,
+        preferred_date: date,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.message || 'Failed to send request.');
+      return;
+    }
+    closeSessionModal();
+    showToast(`Request sent to ${tutorName}!`);
+    fetchMyRequests();
+  } catch {
+    showToast('Failed to send request. Please try again.');
+  }
+};
+
+// Patch closeSessionModal to reset topics
+const _origCloseSessionModal = closeSessionModal;
+closeSessionModal = function() {
+  _origCloseSessionModal();
+  const wrap = document.getElementById('sessionTopicsWrap');
+  if (wrap) wrap.style.display = 'none';
+  const list = document.getElementById('sessionTopicsList');
+  if (list) list.innerHTML = '';
+};
+
+// ===== PATCH renderTutors to add "View Profile" button
+const _origRenderTutors = renderTutors;
+renderTutors = function(tutors) {
+  _origRenderTutors(tutors);
+  // Replace the grid content with updated cards that include a profile button
+  const grid = document.getElementById('tutorsGrid');
+  if (!grid || !tutors.length) return;
+  grid.innerHTML = tutors.map((t, i) => `
+    <div class="tutor-card" style="animation-delay:${i * 0.06}s">
+      <div class="tutor-card-header">
+        <div class="tutor-avatar">${esc(t.initials || t.name[0])}</div>
+        <div class="tutor-info">
+          <div class="tutor-name">${esc(t.name)}</div>
+          <div class="tutor-degree">${esc(t.degree || '')}</div>
+          <div class="tutor-rating"><span class="star">★</span> ${(t.rating || 0).toFixed(1)}
+            <span>(${t.reviews || 0} reviews)</span></div>
+        </div>
+      </div>
+      <div class="tutor-courses">
+        ${(t.courses || []).map(c => `<span class="course-badge">${esc(c)}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+        <button class="btn-outline" style="flex:1;font-size:.82rem;padding:.5rem;"
+                onclick="openTutorProfile('${esc(t.id)}')">View Profile</button>
+        <button class="btn-primary"  style="flex:2;background:var(--purple);"
+                onclick="openSessionModal('${esc(t.id)}')">Request session</button>
+      </div>
+    </div>
+  `).join('');
+};

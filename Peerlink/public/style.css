@@ -1022,3 +1022,65 @@ body.mode-tutee #tuteeBtn {
   gap: 0.75rem;
   margin-top: 1.5rem;
 }
+
+/* ===== PROFILE AVATAR WRAP + PHOTO UPLOAD ===== */
+.profile-avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar-upload-label {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 30px;
+  height: 30px;
+  background: var(--purple);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  transition: var(--transition);
+}
+
+.avatar-upload-label:hover {
+  background: var(--purple-dark, #5a3ea0);
+  transform: scale(1.08);
+}
+
+/* ===== PERSONAL INFO SECTION ===== */
+.personal-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.personal-info-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.info-label {
+  min-width: 90px;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ===== SESSION CARDS — MEETING LINK ===== */
+.request-card a {
+  color: var(--purple);
+  text-decoration: none;
+}
+
+.request-card a:hover {
+  text-decoration: underline;
+}
