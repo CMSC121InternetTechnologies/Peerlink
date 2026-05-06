@@ -730,6 +730,24 @@ body.mode-tutee #tuteeBtn {
     opacity: 1;
 }
 
+.btn-logout {
+  background: transparent;
+  color: var(--coral);
+  border: 1.5px solid var(--coral);
+  padding: 0.45rem 1.25rem;
+  border-radius: 50px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-logout:hover {
+  background: var(--coral);
+  color: white;
+}
+
 /* ===== SESSION REQUESTS MODAL (TUTOR) ===== */
 
 .modal-lg {

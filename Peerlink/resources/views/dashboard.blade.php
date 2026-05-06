@@ -37,11 +37,6 @@
       <a href="#" class="nav-link" id="navMyRequests"  onclick="switchView('myRequests')">My Requests</a>
       <a href="#" class="nav-link" id="navMySessions"  onclick="switchView('mySessions')">My Sessions</a>
       <a href="#" class="nav-link" id="navProfile"     onclick="switchView('profile')">Profile</a>
-      <form method="POST" action="{{ route('logout') }}" style="display:inline;">
-        @csrf
-        <a href="{{ route('logout') }}" class="nav-link"
-           onclick="event.preventDefault(); this.closest('form').submit();">Log out</a>
-      </form>
     </div>
 
     <!-- Notification Bell -->
@@ -84,6 +79,12 @@
         Tutee
       </button>
     </div>
+
+    <!-- Logout Button -->
+    <form method="POST" action="{{ route('logout') }}" style="display: flex; align-items: center;">
+      @csrf
+      <button type="submit" class="btn-logout" title="Log out safely">Log out</button>
+    </form>
   </nav>
 
   <main class="page">
@@ -348,10 +349,8 @@
         </form>
       </div>
     </div>
-
   </main>
 
-  <!-- ===== SESSION REQUEST MODAL (US_09) ===== -->
   <div class="modal-overlay" id="sessionModalOverlay" onclick="closeSessionModal()">
     <div class="modal" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeSessionModal()">✕</button>

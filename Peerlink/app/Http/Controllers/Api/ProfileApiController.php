@@ -14,12 +14,10 @@ use Illuminate\Validation\Rules\Password;
 
 class ProfileApiController extends Controller
 {
-    // GET /api/profile
     public function show(Request $request)
     {
-        $user         = $request->user();
-        $tutorProfile = TutorProfile::find($user->user_id);
-
+        $user = $request->user();
+        $tutorProfile = \App\Models\TutorProfile::where('user_id', $user->user_id)->first();
         $tutorCourses = [];
         if ($tutorProfile) {
             $tutorCourses = $tutorProfile->courses()
@@ -30,15 +28,11 @@ class ProfileApiController extends Controller
                 ->toArray();
         }
 
-        // Tutor dashboard stats
         $upcomingSessions = 0;
         if ($tutorProfile) {
-            $upcomingSessions = TutoringSession::whereHas('request', function ($q) use ($user) {
+            $upcomingSessions = \App\Models\TutoringSession::whereHas('request', function ($q) use ($user) {
                 $q->where('tutor_id', $user->user_id);
-            })
-            ->where('status', 'Scheduled')
-            ->where('scheduled_time', '>', now())
-            ->count();
+            })->where('status', 'Scheduled')->where('scheduled_time', '>', now())->count();
         }
 
         $photo = DB::table('User_Photos')->where('user_id', $user->user_id)->first();
@@ -48,6 +42,7 @@ class ProfileApiController extends Controller
             'bio'              => $tutorProfile?->bio ?? '',
             'isTutor'          => $tutorProfile !== null,
             'tutorCourses'     => $tutorCourses,
+            'tuteeCourses'     => $user->tuteeCourses()->pluck('course_code')->toArray(),
             'coursesCount'     => count($tutorCourses),
             'ratingAvg'        => $tutorProfile ? (float) $tutorProfile->rating_avg : 0.0,
             'upcomingSessions' => $upcomingSessions,
@@ -61,7 +56,6 @@ class ProfileApiController extends Controller
         ]);
     }
 
-    // PATCH /api/profile
     public function update(Request $request)
     {
         $user = $request->user();
@@ -70,6 +64,8 @@ class ProfileApiController extends Controller
             'bio'            => ['nullable', 'string', 'max:250'],
             'tutorCourses'   => ['nullable', 'array'],
             'tutorCourses.*' => ['string', 'exists:Courses,course_code'],
+            'tuteeCourses'   => ['nullable', 'array'],
+            'tuteeCourses.*' => ['string', 'exists:Courses,course_code'],
         ]);
 
         $hasTutorContent = !empty($validated['bio'])
@@ -106,7 +102,7 @@ class ProfileApiController extends Controller
             }
         }
 
-        return response()->json(['message' => 'Profile updated.']);
+        return response()->json(['message' => 'Profile updated successfully.']);
     }
 
     // PATCH /api/user/profile — update personal info (year level, program)

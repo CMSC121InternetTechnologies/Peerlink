@@ -132,20 +132,20 @@ async function fetchProfile() {
     if (!res.ok) return;
     const data = await res.json();
 
+    console.log("PROFILE DATA FROM DATABASE:", data);
+
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
+    userProfile.tuteeCourses = data.tuteeCourses || []; 
     availableRooms           = data.rooms || [];
 
     updateProfileDisplay();
     populateGroupRoomSelect();
 
-    // Tutor dashboard stats
     document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
     document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
     document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
-  } catch {
-    // silently fail; stats stay as '—'
-  }
+  } catch {}
 }
 
 function toggleEditMode(isEdit) {
@@ -189,26 +189,32 @@ async function saveProfile(event) {
     const res = await fetch('/api/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ bio: userProfile.bio, tutorCourses: userProfile.tutorCourses }),
+      body: JSON.stringify({ 
+          bio: userProfile.bio, 
+          tutorCourses: userProfile.tutorCourses,
+          tuteeCourses: userProfile.tuteeCourses
+      }),
     });
     if (!res.ok) throw new Error();
+
     showToast('Profile saved!');
-    fetchProfile(); // refresh stats
+    fetchProfile();
   } catch {
     showToast('Failed to save profile.');
     return;
   }
 
-  updateProfileDisplay();
   toggleEditMode(false);
 }
 
 function updateProfileDisplay() {
   document.getElementById('bioDisplay').textContent = userProfile.bio || 'No bio added yet.';
-  document.getElementById('tutorCoursesDisplay').innerHTML =
-    userProfile.tutorCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
-  document.getElementById('tuteeCoursesDisplay').innerHTML =
-    userProfile.tuteeCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
+
+  const tutorDisplay = document.getElementById('tutorCoursesDisplay');
+  if (tutorDisplay) tutorDisplay.innerHTML = userProfile.tutorCourses.length > 0 ? userProfile.tutorCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join(''): '<p style="color: var(--text-muted); font-size: 0.9rem;">No courses added yet.</p>';
+
+  const tuteeDisplay = document.getElementById('tuteeCoursesDisplay');
+  if (tuteeDisplay) tuteeDisplay.innerHTML = userProfile.tuteeCourses.length > 0 ? userProfile.tuteeCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('') : '<p style="color: var(--text-muted); font-size: 0.9rem;">No courses added yet.</p>';
 }
 
 // ===== DELETE ACCOUNT =====
@@ -250,10 +256,9 @@ function handleCourseInput(e) {
 
 function renderCourseSuggestions(query) {
   const container = document.getElementById('courseSuggestions');
-  let list = Array.from(allUniqueCourses);
-  if (query) list = list.filter(c => c.includes(query));
-  container.innerHTML = list.slice(0, 8)
-    .map(c => `<button onclick="addFilterCourse('${esc(c)}')">${esc(c)}</button>`).join('');
+  let list = window.__courses ? window.__courses.map(c => c.code) : [];
+  if (query) list = list.filter(c => c.includes(query)); 
+  container.innerHTML = list.slice(0, 6).map(c => `<button onclick="addFilterCourse('${esc(c)}')">${esc(c)}</button>`).join('');
 }
 
 function addFilterCourse(code) {
@@ -336,14 +341,15 @@ function openSessionModal(id) {
 
   document.getElementById('modalName').textContent = tutor.name;
   document.getElementById('modalSub').textContent  = tutor.degree || '';
+  
   document.getElementById('modalAvatar').textContent = tutor.initials || tutor.name[0];
 
   const sel = document.getElementById('sessionCourse');
   sel.innerHTML = '<option value="" disabled selected>Select a course</option>' +
     (tutor.courses || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
-  document.getElementById('sessionTopic').value   = '';
-  document.getElementById('sessionDate').value    = '';
+  document.getElementById('sessionTopic').innerHTML = '<option value="" disabled selected>Select a course first</option>';
+  document.getElementById('sessionDate').value = '';
   document.getElementById('sessionMessage').value = '';
   document.getElementById('sessionModalOverlay').classList.add('open');
 }
@@ -351,6 +357,20 @@ function openSessionModal(id) {
 function closeSessionModal() {
   document.getElementById('sessionModalOverlay').classList.remove('open');
   selectedTutor = null;
+}
+
+function updateSessionTopics() {
+    const courseCode = document.getElementById('sessionCourse').value;
+    const topicSelect = document.getElementById('sessionTopic');
+
+    const courseObj = window.__courses.find(c => c.code === courseCode);
+
+    if (courseObj && courseObj.topics && courseObj.topics.length > 0) {
+      topicSelect.innerHTML = '<option value="" disabled selected>Select a topic</option>' +
+      courseObj.topics.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    } else {
+      topicSelect.innerHTML = '<option value="General Tutoring">General Tutoring</option>';
+    }
 }
 
 async function submitRequest() {
@@ -522,7 +542,7 @@ async function claimBroadcast(id) {
     broadcastRequests = broadcastRequests.filter(r => r.id !== id);
     renderBroadcastRequests();
     showToast('Broadcast claimed and session scheduled!');
-    fetchProfile(); // update upcoming sessions count
+    fetchProfile();
   } catch {
     showToast('Action failed. Please try again.');
   }
@@ -900,6 +920,12 @@ function renderObTags() {
 }
 
 async function obFinish() {
+  // Check if the user selected at least one course
+  if (obCourses.length === 0) {
+    showToast('Please add at least one course before finishing.');
+    return;
+  }
+
   const btn = document.getElementById('obFinishBtn');
   btn.disabled   = true;
   btn.textContent = 'Saving…';
