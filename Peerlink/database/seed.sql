@@ -3,7 +3,7 @@
 -- Run AFTER database.sql to populate test data.
 --
 -- All accounts use password:  password
--- Bcrypt hash ($2y$12$):  $2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
+-- Bcrypt hash ($2y$10$):  $2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
 --
 -- Users created:
 --   Tutors        : Alex Santos, Maria Cruz, Ramon dela Pena
