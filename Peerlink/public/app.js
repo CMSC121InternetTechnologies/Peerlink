@@ -333,14 +333,17 @@ function openSessionModal(id) {
 
   document.getElementById('modalName').textContent = tutor.name;
   document.getElementById('modalSub').textContent  = tutor.degree || '';
-  document.getElementById('modalAvatar').textContent = tutor.initials || tutor.name[0];
+  
+  const avatarEl = document.getElementById('modalAvatar');
+  if (tutor.hasPhoto && tutor.id) avatarEl.innerHTML = `<img src="/api/user/photo/${tutor.id}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;">`;
+  else avatarEl.textContent = tutor.initials || tutor.name[0];
 
   const sel = document.getElementById('sessionCourse');
   sel.innerHTML = '<option value="" disabled selected>Select a course</option>' +
     (tutor.courses || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
-  document.getElementById('sessionTopic').value   = '';
-  document.getElementById('sessionDate').value    = '';
+  document.getElementById('sessionTopic').innerHTML = '<option value="" disabled selected>Select a course first</option>';
+  document.getElementById('sessionDate').value = '';
   document.getElementById('sessionMessage').value = '';
   document.getElementById('sessionModalOverlay').classList.add('open');
 }
@@ -348,6 +351,20 @@ function openSessionModal(id) {
 function closeSessionModal() {
   document.getElementById('sessionModalOverlay').classList.remove('open');
   selectedTutor = null;
+}
+
+function updateSessionTopics() {
+    const courseCode = document.getElementById('sessionCourse').value;
+    const topicSelect = document.getElementById('sessionTopic');
+
+    const courseObj = window.__courses.find(c => c.code === courseCode);
+
+    if (courseObj && courseObj.topics && courseObj.topics.length > 0) {
+      topicSelect.innerHTML = '<option value="" disabled selected>Select a topic</option>' +
+      courseObj.topics.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    } else {
+      topicSelect.innerHTML = '<option value="General Tutoring">General Tutoring</option>';
+    }
 }
 
 async function submitRequest() {

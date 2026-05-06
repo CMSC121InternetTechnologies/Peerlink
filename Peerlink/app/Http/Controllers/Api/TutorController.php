@@ -7,12 +7,9 @@ use Illuminate\Http\Request;
 
 class TutorController extends Controller
 {
-    public function index(Request $request) // <-- Added Request here
+    public function index(Request $request)
     {
-        // Added the ->where(...) condition to exclude yourself
-        $tutors = TutorProfile::with(['user', 'reviews', 'courses'])
-                    ->where('user_id', '!=', $request->user()->user_id)
-                    ->get();
+        $tutors = TutorProfile::with(['user', 'reviews', 'courses'])->where('user_id', '!=', $request->user()->user_id)->get();
 
         $formattedTutors = $tutors->map(function ($tutor) {
             
@@ -22,7 +19,7 @@ class TutorController extends Controller
             $rating = $reviewCount > 0 ? $tutor->reviews->avg('rating') : 0.0;
 
             $courses = $tutor->courses->map(function($course) {
-                return str_replace(' ', '', strtoupper($course->course_code));
+                return $course->course_code;
             })->unique()->values();
 
             return [

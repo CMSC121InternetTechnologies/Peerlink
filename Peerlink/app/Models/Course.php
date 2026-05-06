@@ -9,11 +9,16 @@ class Course extends Model
     protected $table = 'Courses';
     protected $primaryKey = 'course_id';
     
-    public $timestamps = false; // Disable created_at and updated_at (for now)
+    public $timestamps = false;
 
     protected $fillable = [
         'division_id', 
         'course_code', 
         'course_name'
     ];
+
+    public function topics()
+    {
+        return $this->hasMany(CourseTopic::class, 'course_id', 'course_id');
+    }
 }

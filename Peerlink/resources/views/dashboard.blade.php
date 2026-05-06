@@ -14,7 +14,13 @@
   <!-- Pass server data to JS -->
   <script>
     window.__onboarding = {{ $onboarding ? 'true' : 'false' }};
-    window.__courses = {!! json_encode($courses->map(fn($c) => ['code' => $c->course_code, 'name' => $c->course_name])->values()) !!};
+    window.__courses = {!! json_encode($courses->map(function($c) {
+      return [
+        'code' => $c->course_code,
+        'name' => $c->course_name,
+        'topics' => $c->topics->pluck('topic_name')
+      ];
+    })->values()) !!};
   </script>
 
   <!-- Navigation Bar -->
@@ -249,10 +255,8 @@
         </form>
       </div>
     </div>
-
   </main>
 
-  <!-- ===== SESSION REQUEST MODAL (US_09) ===== -->
   <div class="modal-overlay" id="sessionModalOverlay" onclick="closeSessionModal()">
     <div class="modal" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeSessionModal()">✕</button>
@@ -261,11 +265,13 @@
       <p class="modal-sub"  id="modalSub"></p>
       <div class="modal-form">
         <label>Course</label>
-        <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;">
+        <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;" onchange="updateSessionTopics()">
           <option value="" disabled selected>Select a course</option>
         </select>
         <label>Subject / Topic</label>
-        <input type="text" placeholder="e.g. Pointers in C, Recursion…" id="sessionTopic"/>
+        <select id="sessionTopic" class="select-course" style="margin-bottom:.75rem;">
+          <option value="" disabled selected>Select a course first</option>
+        </select>
         <label>Preferred Schedule</label>
         <input type="datetime-local" id="sessionDate"/>
         <label>Message (optional)</label>

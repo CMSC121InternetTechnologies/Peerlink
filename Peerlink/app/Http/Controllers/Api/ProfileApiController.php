@@ -48,7 +48,6 @@ class ProfileApiController extends Controller
         ]);
     }
 
-    // PATCH /api/profile
     public function update(Request $request)
     {
         $user = $request->user();
@@ -61,26 +60,39 @@ class ProfileApiController extends Controller
             'tuteeCourses.*' => ['string', 'exists:Courses,course_code'],
         ]);
 
-        $tutorProfile = TutorProfile::firstOrCreate(
-            ['user_id' => $user->user_id],
-            ['bio' => '', 'rating_avg' => 0]
-        );
+        $tutorProfile = TutorProfile::where('user_id', $user->user_id)->first();
+        if (!$tutorProfile) {
+            $tutorProfile = new TutorProfile();
+            $tutorProfile->user_id = $user->user_id;
+            $tutorProfile->rating_avg = 0;
+        }
         $tutorProfile->bio = $validated['bio'] ?? '';
         $tutorProfile->save();
 
-        if (array_key_exists('tuteeCourses', $validated)) {
-            $tuteeIds = Course::whereIn('course_code', $validated['tuteeCourses'] ?? [])
-                ->pluck('course_id')
-                ->toArray();
-
-            DB::table('Tutee_Courses')->where('user_id', $user->user_id)->delete();
-            if (!empty($tuteeIds)) {
-                DB::table('Tutee_Courses')->insert(
-                    array_map(fn($cid) => ['user_id' => $user->user_id, 'course_id' => $cid], $tuteeIds)
-                );
+        if ($request->has('tutorCourses')) {
+            $courseIds = Course::whereIn('course_code', $validated['tutorCourses'] ?? [])->pluck('course_id')->toArray();
+            DB::table('Tutor_Expertise')->where('user_id', $user->user_id)->delete();
+            
+            foreach ($courseIds as $cid) {
+                DB::table('Tutor_Expertise')->insert([
+                    'user_id' => $user->user_id, 
+                    'course_id' => $cid
+                ]);
             }
         }
 
-        return response()->json(['message' => 'Profile updated.']);
+        if ($request->has('tuteeCourses')) {
+            $tuteeIds = Course::whereIn('course_code', $validated['tuteeCourses'] ?? [])->pluck('course_id')->toArray();
+            DB::table('Tutee_Courses')->where('user_id', $user->user_id)->delete();
+            
+            foreach ($tuteeIds as $cid) {
+                DB::table('Tutee_Courses')->insert([
+                    'user_id' => $user->user_id, 
+                    'course_id' => $cid
+                ]);
+            }
+        }
+
+        return response()->json(['message' => 'Profile updated successfully.']);
     }
 }
