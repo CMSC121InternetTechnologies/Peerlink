@@ -45,12 +45,49 @@ copy .env.example .env
 cp .env.example .env
 ```
 
+## Configure the environment file
+
+Open `.env` and make sure the database section matches your local MySQL setup:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=PeerLink
+DB_USERNAME=root
+DB_PASSWORD=your_mysql_password
+```
+
+
 ## Generate the Application Key
 Every Laravel app needs a unique cryptographic key for security (which gets stored in your newly created .env file).
 
 ```bash
 php artisan key:generate
 ```
+## Set up the database
+
+###  Create the database (if it does not exist yet)
+
+Log into MySQL and run:
+
+```sql
+CREATE DATABASE PeerLink CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+###  Import the schema
+
+```bash
+mysql -u root -p PeerLink < database/database.sql
+```
+
+###  Import sample data *(optional but recommended for testing)*
+
+```bash
+php artisan db:seed
+```
+> The seed populates 8 test users, 9 request scenarios covering every status, sessions, reviews, and notifications.  
+> All seed accounts use the password: **`password`**
 
 ## Set Up Database 
 Finally, open the .env file, ensure that the  database name is correct, and run the migrations to rebuild the database tables.
@@ -114,7 +151,51 @@ Create your files at the
     resources/[css][js][views]
 ```
 folder. 
+## Test Accounts
 
+All accounts use the password `password`.
+
+| Name | Email | Role |
+|---|---|---|
+| Alex Santos | alex.santos@up.edu.ph | Tutor (CMSC121, CMSC122) |
+| Maria Cruz | maria.cruz@up.edu.ph | Tutor (MATH18, STAT105) |
+| Ramon dela Pena | ramon.delapena@up.edu.ph | Tutor (CMSC11, CMSC12) |
+| Bianca Reyes | bianca.reyes@up.edu.ph | Student |
+| Carlo Manalo | carlo.manalo@up.edu.ph | Student |
+| Diana Lim | diana.lim@up.edu.ph | Student |
+| Elena Navarro | elena.navarro@up.edu.ph | Mixed (Tutor + Student) |
+| Francis Tan | francis.tan@up.edu.ph | Mixed (Tutor + Student) |
+
+---
+
+## Pre-loaded Request Scenarios
+
+Log in as any student to see these cases in **My Requests**:
+
+| # | Student | Tutor | Course | Status |
+|---|---|---|---|---|
+| R1 | Bianca | Alex | CMSC121 | Pending |
+| R2 | Carlo | Alex | CMSC122 | Approved — upcoming In-Person session |
+| R3 | Diana | Maria | MATH18 | Approved — completed Online session + review |
+| R4 | Carlo | Maria | STAT105 | Declined |
+| R5 | Bianca | Ramon | CMSC11 | Counter-Proposed — awaiting student response |
+| R6 | Elena | Ramon | CMSC12 | Expired |
+| R7 | Diana | *(none)* | MATH18 | Broadcast — open for any tutor to claim |
+| R8 | Francis | Alex | CMSC121 | Approved — claimed broadcast, upcoming session |
+| R9 | *(group)* | Alex | CMSC121 | Approved — open group study session |
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `php artisan` not found | Confirm you are inside the `Peerlink` folder, not the outer `PeerLink` folder |
+| Database connection refused | Start MySQL in XAMPP or Laragon before running the server |
+| `APP_KEY` is empty | Run `php artisan key:generate` |
+| Blank page or 500 error | Run `php artisan config:clear` then refresh |
+| CSS or JS not loading | Assets are served directly from `public/` — no build step is needed |
+| Seed errors on duplicate columns | The seed handles this gracefully; errors for existing columns are safe to ignore |
 
 # 🔗 PeerLink
 **Democratizing Academic Support Through Peer-to-Peer Tutoring**
