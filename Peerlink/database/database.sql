@@ -144,6 +144,38 @@ INSERT INTO `Divisions` VALUES
 UNLOCK TABLES;
 
 --
+-- Table structure for table `Notifications`
+--
+
+DROP TABLE IF EXISTS `Notifications`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `Notifications` (
+  `notification_id` char(36) NOT NULL DEFAULT uuid(),
+  `user_id` char(36) NOT NULL,
+  `type` varchar(50) NOT NULL,
+  `message` text NOT NULL,
+  `request_id` char(36) DEFAULT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`notification_id`),
+  KEY `user_id` (`user_id`),
+  KEY `request_id` (`request_id`),
+  CONSTRAINT `Notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `Notifications_ibfk_2` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `Notifications`
+--
+
+LOCK TABLES `Notifications` WRITE;
+/*!40000 ALTER TABLE `Notifications` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Notifications` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `Programs`
 --
 
@@ -456,7 +488,8 @@ CREATE TABLE `auth_sessions` (
 LOCK TABLES `auth_sessions` WRITE;
 /*!40000 ALTER TABLE `auth_sessions` DISABLE KEYS */;
 INSERT INTO `auth_sessions` VALUES
-('bAYHaMpmP5Q81PQ6aFmTgZYewqowb2eaeoLF2VLu',NULL,'127.0.0.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.118.1 Chrome/142.0.7444.265 Electron/39.8.8 Safari/537.36','eyJfdG9rZW4iOiJ5TGZFUkY4Vlp1NVFDTVFaSHFPRkJhelowUHlnU0dPZFd4UG5LeE93IiwiX2ZsYXNoIjp7Im9sZCI6W10sIm5ldyI6W119LCJfcHJldmlvdXMiOnsidXJsIjoiaHR0cDpcL1wvMTI3LjAuMC4xOjgwMDFcL2xvZ2luIiwicm91dGUiOiJsb2dpbiJ9fQ==',1778057313);
+('Q9U3KbE4Fko2iQ9SjqGShKlwn7LDc7wcTwdtgMVi',NULL,'127.0.0.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36','eyJfdG9rZW4iOiJ1NGd5dEp4NGV4ckpNRVdCVDUyR0ZVWTlEWlUxNk9KVzBnM3Rkd0g0IiwiX2ZsYXNoIjp7Im9sZCI6W10sIm5ldyI6W119LCJfcHJldmlvdXMiOnsidXJsIjoiaHR0cDpcL1wvbG9jYWxob3N0OjgwMDFcL2xvZ2luIiwicm91dGUiOiJsb2dpbiJ9fQ==',1778061684),
+('XZEle4zwgQn7HQRQMW0kSUNMOlKJbRPXWy1UzLXY','43d55a88-794a-455a-a6a0-166a83e7bbfa','127.0.0.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.118.1 Chrome/142.0.7444.265 Electron/39.8.8 Safari/537.36','eyJfdG9rZW4iOiJwN1h1WTJ6Vm1kWDFSWWFVUHdSOFBNcWNsRjZEYzhPSXI3eFozYW9kIiwiX2ZsYXNoIjp7Im9sZCI6W10sIm5ldyI6W119LCJfcHJldmlvdXMiOnsidXJsIjoiaHR0cDpcL1wvMTI3LjAuMC4xOjgwMDFcL2FwaVwvbm90aWZpY2F0aW9ucyIsInJvdXRlIjpudWxsfSwibG9naW5fd2ViXzU5YmEzNmFkZGMyYjJmOTQwMTU4MGYwMTRjN2Y1OGVhNGUzMDk4OWQiOiI0M2Q1NWE4OC03OTRhLTQ1NWEtYTZhMC0xNjZhODNlN2JiZmEifQ==',1778060854);
 /*!40000 ALTER TABLE `auth_sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -483,8 +516,12 @@ CREATE TABLE `cache` (
 LOCK TABLES `cache` WRITE;
 /*!40000 ALTER TABLE `cache` DISABLE KEYS */;
 INSERT INTO `cache` VALUES
+('laravel-cache-7dfe97e82f36a8ae9c31b57ea66de64892a6a60b','i:5;',1778059883),
+('laravel-cache-7dfe97e82f36a8ae9c31b57ea66de64892a6a60b:timer','i:1778059883;',1778059883),
 ('laravel-cache-926b22864bb97779991a62047e5daf92303d77f1','i:3;',1778057350),
 ('laravel-cache-926b22864bb97779991a62047e5daf92303d77f1:timer','i:1778057350;',1778057350),
+('laravel-cache-92e4d1e4658f2fcf58e2b6a276922fa09bdb3b8b','i:6;',1778061721),
+('laravel-cache-92e4d1e4658f2fcf58e2b6a276922fa09bdb3b8b:timer','i:1778061721;',1778061721),
 ('laravel-cache-b8d50ffa13dc28030796cda46f90ca193022354a','i:1;',1778056740),
 ('laravel-cache-b8d50ffa13dc28030796cda46f90ca193022354a:timer','i:1778056740;',1778056740),
 ('laravel-cache-ea6445dc1772b0334c6f5322d2815ef0b31fcbca','i:8;',1778057334),
@@ -705,4 +742,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-06 16:51:02
+-- Dump completed on 2026-05-06 18:05:52
