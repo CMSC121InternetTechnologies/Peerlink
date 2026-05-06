@@ -244,10 +244,9 @@ function handleCourseInput(e) {
 
 function renderCourseSuggestions(query) {
   const container = document.getElementById('courseSuggestions');
-  let list = Array.from(allUniqueCourses);
-  if (query) list = list.filter(c => c.includes(query));
-  container.innerHTML = list.slice(0, 8)
-    .map(c => `<button onclick="addFilterCourse('${esc(c)}')">${esc(c)}</button>`).join('');
+  let list = window.__courses ? window.__courses.map(c => c.code) : [];
+  if (query) list = list.filter(c => c.includes(query)); 
+  container.innerHTML = list.slice(0, 6).map(c => `<button onclick="addFilterCourse('${esc(c)}')">${esc(c)}</button>`).join('');
 }
 
 function addFilterCourse(code) {
