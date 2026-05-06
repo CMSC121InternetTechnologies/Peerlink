@@ -1,13 +1,9 @@
-/*M!999999\- enable the sandbox mode */
+/*M!999999\- enable the sandbox mode */ 
 -- MariaDB dump 10.19  Distrib 10.11.16-MariaDB, for Linux (x86_64)
 --
 -- Host: localhost    Database: PeerLink
 -- ------------------------------------------------------
 -- Server version	10.11.16-MariaDB
-
--- FIX: Create and select the database before creating tables
-CREATE DATABASE IF NOT EXISTS `PeerLink`;
-USE `PeerLink`;
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -21,89 +17,39 @@ USE `PeerLink`;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Table structure for table `Divisions`
+-- Table structure for table `Course_Topics`
 --
 
-DROP TABLE IF EXISTS `Divisions`;
+DROP TABLE IF EXISTS `Course_Topics`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Divisions` (
-  `division_id` varchar(10) NOT NULL,
-  `division_name` text NOT NULL,
-  PRIMARY KEY (`division_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `Course_Topics` (
+  `topic_id` int(11) NOT NULL AUTO_INCREMENT,
+  `course_id` int(11) NOT NULL,
+  `topic_name` text NOT NULL,
+  PRIMARY KEY (`topic_id`),
+  KEY `course_id` (`course_id`),
+  CONSTRAINT `Course_Topics_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `Divisions`
+-- Dumping data for table `Course_Topics`
 --
 
-LOCK TABLES `Divisions` WRITE;
-/*!40000 ALTER TABLE `Divisions` DISABLE KEYS */;
-INSERT INTO `Divisions` VALUES ('DH','Division of Humanities'),('DM','Division of Management'),('DNSM','Division of Natural Sciences and Mathematics'),('DSS','Division of Social Sciences');
-/*!40000 ALTER TABLE `Divisions` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `Programs`
---
-
-DROP TABLE IF EXISTS `Programs`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Programs` (
-  `program_code` varchar(15) NOT NULL,
-  `division_id` varchar(10) DEFAULT NULL,
-  `program_name` text NOT NULL,
-  PRIMARY KEY (`program_code`),
-  KEY `division_id` (`division_id`),
-  CONSTRAINT `Programs_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`) ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `Programs`
---
-
-LOCK TABLES `Programs` WRITE;
-/*!40000 ALTER TABLE `Programs` DISABLE KEYS */;
-INSERT INTO `Programs` VALUES ('BALit','DH','Bachelor of Arts in Literature'),('BAMA','DH','Bachelor of Arts in Media Arts'),('BAPolSci','DSS','Bachelor of Arts in Political Science'),('BAPsych','DSS','Bachelor of Arts in Psychology'),('BSA','DM','Bachelor of Science in Accountancy'),('BSAM','DNSM','Bachelor of Science in Applied Mathematics'),('BSBio','DNSM','Bachelor of Science in Biology'),('BSCS','DNSM','Bachelor of Science in Computer Science'),('BSEcon','DSS','Bachelor of Science in Economics'),('BSM','DM','Bachelor of Science in Management'),('MM','DM','Master of Management'),('MSES','DNSM','Master of Science in Environmental Science');
-/*!40000 ALTER TABLE `Programs` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `Users`
--- FIX: DEFAULT uuid() -> DEFAULT (uuid())
---
-
-DROP TABLE IF EXISTS `Users`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Users` (
-  `user_id` char(36) NOT NULL DEFAULT (uuid()),
-  `email` varchar(255) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `first_name` varchar(100) NOT NULL,
-  `middle_name` varchar(100) DEFAULT NULL,
-  `last_name` varchar(100) NOT NULL,
-  `contact_number` varchar(15) DEFAULT NULL,
-  `current_year_level` int(11) NOT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `program_code` varchar(15) NOT NULL,
-  PRIMARY KEY (`user_id`),
-  UNIQUE KEY `email` (`email`),
-  KEY `fk_users_program` (`program_code`),
-  CONSTRAINT `fk_users_program` FOREIGN KEY (`program_code`) REFERENCES `Programs` (`program_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `Users`
---
-
-LOCK TABLES `Users` WRITE;
-/*!40000 ALTER TABLE `Users` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Users` ENABLE KEYS */;
+LOCK TABLES `Course_Topics` WRITE;
+/*!40000 ALTER TABLE `Course_Topics` DISABLE KEYS */;
+INSERT INTO `Course_Topics` VALUES
+(1,6,'Introduction to the World Wide Web (WWW)'),
+(2,6,'Hypertext Markup Language (HTML) Fundamentals'),
+(3,6,'Cascading Style Sheets (CSS) Fundamentals'),
+(4,6,'JavaScript and Document Object Model'),
+(5,6,'Client-side Web Applications'),
+(6,6,'Server-side Programming'),
+(7,6,'Services Oriented Architecture (SOA)'),
+(8,6,'Web Frameworks (Laravel)'),
+(9,6,'Web Security Fundamentals');
+/*!40000 ALTER TABLE `Course_Topics` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -121,7 +67,7 @@ CREATE TABLE `Courses` (
   PRIMARY KEY (`course_id`),
   KEY `division_id` (`division_id`),
   CONSTRAINT `Courses_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -130,153 +76,119 @@ CREATE TABLE `Courses` (
 
 LOCK TABLES `Courses` WRITE;
 /*!40000 ALTER TABLE `Courses` DISABLE KEYS */;
-INSERT INTO `Courses` VALUES (1,'DH','ARTS1','Critical Perspectives in the Arts'),(2,'DNSM','BIO162','Tropical Coasts: Biodiversity, Ecology and Conversation'),(3,'DNSM','CMSC10','Introduction to Computer Science'),(4,'DNSM','CMSC11','Fundamentals of Programming 1'),(5,'DNSM','CMSC12','Fundamentals of Programming 2'),(6,'DNSM','CMSC121','Internet Technologies'),(7,'DNSM','CMSC122','Data Structures and Algorithms 1'),(8,'DNSM','CMSC123','Data Structures and Algorithms 2'),(9,'DNSM','CMSC124','Automata and Language Theory'),(10,'DNSM','CMSC125','Operating Systems'),(11,'DNSM','CMSC128','Introduction to Software Engineering'),(12,'DNSM','CMSC13','Survey of Programming Paradigms'),(13,'DNSM','CMSC133','Computer Organization and Architecture with Assembly Programming'),(14,'DNSM','CMSC141','Design and Implementation of Programming Languages'),(15,'DNSM','CMSC154','Fundamentals of Geographic Information Systems'),(16,'DNSM','CMSC155','Fundamentals of Remote Sensing'),(17,'DNSM','CMSC170','Introduction to Artificial Intelligence'),(18,'DNSM','CMSC189','Technical Writing for Computer Science'),(19,'DH','COMM10','Critical Perspective in Communication'),(20,'DSS','ETHICS1','Ethics and Moral Reasoning in Everyday Life'),(21,'DSS','KAS1','Kasaysayan ng Pilipinas'),(22,'DNSM','MATH18','Precalculus Mathematics'),(23,'DNSM','MATH55','Calculus 3'),(24,'DH','PE1','Foundations of Physical Fitness'),(25,'DH','PE2','Ballroom'),(26,'DH','PE2','Ballet'),(27,'DH','PE2','Football'),(28,'DH','PE2','Volleyball'),(29,'DH','PHILARTS1','Philippine Arts and Culture'),(30,'DNSM','PHYSICS71','Elementary Physics I'),(31,'DNSM','SCIENCE10','Probing the Physical World'),(32,'DNSM','SCIENCE11','Living Systems: Concepts and Dynamics'),(33,'DNSM','STAT105','Introduction to Statistical Analysis'),(34,'DNSM','STS1','Science, Technology and Society'),(35,'DH','WIKA1','Wika, Kultura at Lipunan');
+INSERT INTO `Courses` VALUES
+(1,'DH','ARTS1','Critical Perspectives in the Arts'),
+(2,'DNSM','BIO162','Tropical Coasts: Biodiversity, Ecology and Conversation'),
+(3,'DNSM','CMSC10','Introduction to Computer Science'),
+(4,'DNSM','CMSC11','Fundamentals of Programming 1'),
+(5,'DNSM','CMSC12','Fundamentals of Programming 2'),
+(6,'DNSM','CMSC121','Internet Technologies'),
+(7,'DNSM','CMSC122','Data Structures and Algorithms 1'),
+(8,'DNSM','CMSC123','Data Structures and Algorithms 2'),
+(9,'DNSM','CMSC124','Automata and Language Theory'),
+(10,'DNSM','CMSC125','Operating Systems'),
+(11,'DNSM','CMSC128','Introduction to Software Engineering'),
+(12,'DNSM','CMSC13','Survey of Programming Paradigms'),
+(13,'DNSM','CMSC133','Computer Organization and Architecture with Assembly Programming'),
+(14,'DNSM','CMSC141','Design and Implementation of Programming Languages'),
+(15,'DNSM','CMSC154','Fundamentals of Geographic Information Systems'),
+(16,'DNSM','CMSC155','Fundamentals of Remote Sensing'),
+(17,'DNSM','CMSC170','Introduction to Artificial Intelligence'),
+(18,'DNSM','CMSC189','Technical Writing for Computer Science'),
+(19,'DH','COMM10','Critical Perspective in Communication'),
+(20,'DSS','ETHICS1','Ethics and Moral Reasoning in Everyday Life'),
+(21,'DSS','KAS1','Kasaysayan ng Pilipinas'),
+(22,'DNSM','MATH18','Precalculus Mathematics'),
+(23,'DNSM','MATH55','Calculus 3'),
+(24,'DH','PE1','Foundations of Physical Fitness'),
+(25,'DH','PE2','Ballroom'),
+(26,'DH','PE2','Ballet'),
+(27,'DH','PE2','Football'),
+(28,'DH','PE2','Volleyball'),
+(29,'DH','PHILARTS1','Philippine Arts and Culture'),
+(30,'DNSM','PHYSICS71','Elementary Physics I'),
+(31,'DNSM','SCIENCE10','Probing the Physical World'),
+(32,'DNSM','SCIENCE11','Living Systems: Concepts and Dynamics'),
+(33,'DNSM','STAT105','Introduction to Statistical Analysis'),
+(34,'DNSM','STS1','Science, Technology and Society'),
+(35,'DH','WIKA1','Wika, Kultura at Lipunan');
 /*!40000 ALTER TABLE `Courses` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
--- Table structure for table `Course_Topics`
+-- Table structure for table `Divisions`
 --
 
-DROP TABLE IF EXISTS `Course_Topics`;
+DROP TABLE IF EXISTS `Divisions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Course_Topics` (
-  `topic_id` int(11) NOT NULL AUTO_INCREMENT,
-  `course_id` int(11) NOT NULL,
-  `topic_name` text NOT NULL,
-  PRIMARY KEY (`topic_id`),
-  KEY `course_id` (`course_id`),
-  CONSTRAINT `Course_Topics_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `Divisions` (
+  `division_id` varchar(10) NOT NULL,
+  `division_name` text NOT NULL,
+  PRIMARY KEY (`division_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `Course_Topics`
+-- Dumping data for table `Divisions`
 --
 
-LOCK TABLES `Course_Topics` WRITE;
-/*!40000 ALTER TABLE `Course_Topics` DISABLE KEYS */;
-INSERT INTO `Course_Topics` VALUES (1,6,'Introduction to the World Wide Web (WWW)'),(2,6,'Hypertext Markup Language (HTML) Fundamentals'),(3,6,'Cascading Style Sheets (CSS) Fundamentals'),(4,6,'JavaScript and Document Object Model'),(5,6,'Client-side Web Applications'),(6,6,'Server-side Programming'),(7,6,'Services Oriented Architecture (SOA)'),(8,6,'Web Frameworks (Laravel)'),(9,6,'Web Security Fundamentals');
-/*!40000 ALTER TABLE `Course_Topics` ENABLE KEYS */;
+LOCK TABLES `Divisions` WRITE;
+/*!40000 ALTER TABLE `Divisions` DISABLE KEYS */;
+INSERT INTO `Divisions` VALUES
+('DH','Division of Humanities'),
+('DM','Division of Management'),
+('DNSM','Division of Natural Sciences and Mathematics'),
+('DSS','Division of Social Sciences');
+/*!40000 ALTER TABLE `Divisions` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
--- Table structure for table `Rooms`
+-- Table structure for table `Programs`
 --
 
-DROP TABLE IF EXISTS `Rooms`;
+DROP TABLE IF EXISTS `Programs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Rooms` (
-  `room_id` int(11) NOT NULL AUTO_INCREMENT,
-  `room_code` varchar(20) NOT NULL,
-  `room_name` text NOT NULL,
-  `room_type` enum('Physical','Virtual') NOT NULL,
-  `capacity` int(11) NOT NULL,
-  PRIMARY KEY (`room_id`),
-  UNIQUE KEY `room_code` (`room_code`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `Rooms`
---
-
-LOCK TABLES `Rooms` WRITE;
-/*!40000 ALTER TABLE `Rooms` DISABLE KEYS */;
-INSERT INTO `Rooms` VALUES (1,'CSLAB2','Computer Science Laboratory Room 2','Physical',24),(2,'CSLAB1','Computer Science Laboratory 1','Physical',24),(3,'GMeet','Google Meet','Virtual',100),(4,'Zoom','Zoom','Virtual',100);
-/*!40000 ALTER TABLE `Rooms` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `Tutor_Profiles`
---
-
-DROP TABLE IF EXISTS `Tutor_Profiles`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Tutor_Profiles` (
-  `user_id` char(36) NOT NULL,
-  `bio` text DEFAULT NULL,
-  `rating_avg` decimal(3,2) DEFAULT 0.00,
-  PRIMARY KEY (`user_id`),
-  CONSTRAINT `Tutor_Profiles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
+CREATE TABLE `Programs` (
+  `program_code` varchar(15) NOT NULL,
+  `division_id` varchar(10) DEFAULT NULL,
+  `program_name` text NOT NULL,
+  PRIMARY KEY (`program_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `Tutor_Profiles`
+-- Dumping data for table `Programs`
 --
 
-LOCK TABLES `Tutor_Profiles` WRITE;
-/*!40000 ALTER TABLE `Tutor_Profiles` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Tutor_Profiles` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `Tutor_Expertise`
---
-
-DROP TABLE IF EXISTS `Tutor_Expertise`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Tutor_Expertise` (
-  `user_id` char(36) NOT NULL,
-  `topic_id` int(11) NOT NULL,
-  PRIMARY KEY (`user_id`,`topic_id`),
-  KEY `topic_id` (`topic_id`),
-  CONSTRAINT `Tutor_Expertise_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Tutor_Profiles` (`user_id`) ON DELETE CASCADE,
-  CONSTRAINT `Tutor_Expertise_ibfk_2` FOREIGN KEY (`topic_id`) REFERENCES `Course_Topics` (`topic_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `Tutor_Expertise`
---
-
-LOCK TABLES `Tutor_Expertise` WRITE;
-/*!40000 ALTER TABLE `Tutor_Expertise` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Tutor_Expertise` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `User_Photos`
---
-
-DROP TABLE IF EXISTS `User_Photos`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `User_Photos` (
-  `photo_id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` char(36) NOT NULL,
-  `image_data` longblob NOT NULL,
-  `uploaded_at` timestamp NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`photo_id`),
-  UNIQUE KEY `user_id` (`user_id`),
-  CONSTRAINT `User_Photos_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `User_Photos`
---
-
-LOCK TABLES `User_Photos` WRITE;
-/*!40000 ALTER TABLE `User_Photos` DISABLE KEYS */;
-/*!40000 ALTER TABLE `User_Photos` ENABLE KEYS */;
+LOCK TABLES `Programs` WRITE;
+/*!40000 ALTER TABLE `Programs` DISABLE KEYS */;
+INSERT INTO `Programs` VALUES
+('BALit','DH','Bachelor of Arts in Literature'),
+('BAMA','DH','Bachelor of Arts in Media Arts'),
+('BAPolSci','DSS','Bachelor of Arts in Political Science'),
+('BAPsych','DSS','Bachelor of Arts in Psychology'),
+('BSA','DM','Bachelor of Science in Accountancy'),
+('BSAM','DNSM','Bachelor of Science in Applied Mathematics'),
+('BSBio','DNSM','Bachelor of Science in Biology'),
+('BSCS','DNSM','Bachelor of Science in Computer Science'),
+('BSEcon','DSS','Bachelor of Science in Economics'),
+('BSM','DM','Bachelor of Science in Management'),
+('MM','DM','Master of Management'),
+('MSES','DNSM','Master of Science in Environmental Science');
+/*!40000 ALTER TABLE `Programs` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
 -- Table structure for table `Requests`
--- FIX: DEFAULT uuid() -> DEFAULT (uuid())
 --
 
 DROP TABLE IF EXISTS `Requests`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Requests` (
-  `request_id` char(36) NOT NULL DEFAULT (uuid()),
+  `request_id` char(36) NOT NULL DEFAULT uuid(),
   `student_id` char(36) NOT NULL,
   `tutor_id` char(36) DEFAULT NULL,
   `course_id` int(11) NOT NULL,
@@ -296,7 +208,7 @@ CREATE TABLE `Requests` (
   CONSTRAINT `Requests_ibfk_2` FOREIGN KEY (`tutor_id`) REFERENCES `Users` (`user_id`),
   CONSTRAINT `Requests_ibfk_3` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`),
   CONSTRAINT `Requests_ibfk_4` FOREIGN KEY (`counter_proposed_room_id`) REFERENCES `Rooms` (`room_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -309,112 +221,46 @@ LOCK TABLES `Requests` WRITE;
 UNLOCK TABLES;
 
 --
--- Table structure for table `Sessions`
--- FIX: DEFAULT uuid() -> DEFAULT (uuid())
+-- Table structure for table `Rooms`
 --
 
-DROP TABLE IF EXISTS `Sessions`;
+DROP TABLE IF EXISTS `Rooms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Sessions` (
-  `session_id` char(36) NOT NULL DEFAULT (uuid()),
-  `request_id` char(36) NOT NULL,
-  `modality` enum('In-Person','Online') NOT NULL,
-  `room_id` int(11) NOT NULL,
-  `meeting_link` text DEFAULT NULL,
-  `scheduled_time` datetime NOT NULL,
-  `status` enum('Scheduled','Completed','Cancelled') DEFAULT 'Scheduled',
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`session_id`),
-  UNIQUE KEY `request_id` (`request_id`),
-  KEY `room_id` (`room_id`),
-  CONSTRAINT `Sessions_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE CASCADE,
-  CONSTRAINT `Sessions_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `Rooms` (`room_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `Rooms` (
+  `room_id` int(11) NOT NULL AUTO_INCREMENT,
+  `room_code` varchar(20) NOT NULL,
+  `room_name` text NOT NULL,
+  `room_type` enum('Physical','Virtual') NOT NULL,
+  `capacity` int(11) NOT NULL,
+  PRIMARY KEY (`room_id`),
+  UNIQUE KEY `room_code` (`room_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `Sessions`
+-- Dumping data for table `Rooms`
 --
 
-LOCK TABLES `Sessions` WRITE;
-/*!40000 ALTER TABLE `Sessions` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Sessions` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `Session_Media`
--- FIX: DEFAULT uuid() -> DEFAULT (uuid())
---
-
-DROP TABLE IF EXISTS `Session_Media`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Session_Media` (
-  `media_id` char(36) NOT NULL DEFAULT (uuid()),
-  `session_id` char(36) NOT NULL,
-  `uploader_id` char(36) NOT NULL,
-  `image_data` longblob NOT NULL,
-  `uploaded_at` timestamp NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`media_id`),
-  KEY `session_id` (`session_id`),
-  KEY `uploader_id` (`uploader_id`),
-  CONSTRAINT `Session_Media_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
-  CONSTRAINT `Session_Media_ibfk_2` FOREIGN KEY (`uploader_id`) REFERENCES `Users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `Session_Media`
---
-
-LOCK TABLES `Session_Media` WRITE;
-/*!40000 ALTER TABLE `Session_Media` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Session_Media` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `Session_Participants`
--- FIX: DEFAULT uuid() -> DEFAULT (uuid())
---
-
-DROP TABLE IF EXISTS `Session_Participants`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Session_Participants` (
-  `participation_id` char(36) NOT NULL DEFAULT (uuid()),
-  `session_id` char(36) NOT NULL,
-  `user_id` char(36) NOT NULL,
-  `role` enum('Tutor','Tutee') NOT NULL,
-  `has_attended` tinyint(1) DEFAULT NULL,
-  `joined_at` timestamp NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`participation_id`),
-  KEY `session_id` (`session_id`),
-  KEY `user_id` (`user_id`),
-  CONSTRAINT `Session_Participants_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
-  CONSTRAINT `Session_Participants_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `Session_Participants`
---
-
-LOCK TABLES `Session_Participants` WRITE;
-/*!40000 ALTER TABLE `Session_Participants` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Session_Participants` ENABLE KEYS */;
+LOCK TABLES `Rooms` WRITE;
+/*!40000 ALTER TABLE `Rooms` DISABLE KEYS */;
+INSERT INTO `Rooms` VALUES
+(1,'CSLAB2','Computer Science Laboratory Room 2','Physical',24),
+(2,'CSLAB1','Computer Science Laboratory 1','Physical',24),
+(3,'GMeet','Google Meet','Virtual',100),
+(4,'Zoom','Zoom','Virtual',100);
+/*!40000 ALTER TABLE `Rooms` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
 -- Table structure for table `Session_Reviews`
--- FIX: DEFAULT uuid() -> DEFAULT (uuid())
 --
 
 DROP TABLE IF EXISTS `Session_Reviews`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Session_Reviews` (
-  `review_id` char(36) NOT NULL DEFAULT (uuid()),
+  `review_id` char(36) NOT NULL DEFAULT uuid(),
   `session_id` char(36) NOT NULL,
   `reviewer_id` char(36) NOT NULL,
   `reviewee_id` char(36) NOT NULL,
@@ -428,7 +274,7 @@ CREATE TABLE `Session_Reviews` (
   CONSTRAINT `Session_Reviews_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`),
   CONSTRAINT `Session_Reviews_ibfk_2` FOREIGN KEY (`reviewer_id`) REFERENCES `Users` (`user_id`),
   CONSTRAINT `Session_Reviews_ibfk_3` FOREIGN KEY (`reviewee_id`) REFERENCES `Users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -441,29 +287,146 @@ LOCK TABLES `Session_Reviews` WRITE;
 UNLOCK TABLES;
 
 --
--- Table structure for table `Session_Topics`
+-- Table structure for table `Sessions`
 --
 
-DROP TABLE IF EXISTS `Session_Topics`;
+DROP TABLE IF EXISTS `Sessions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `Session_Topics` (
-  `session_id` char(36) NOT NULL,
-  `topic_id` int(11) NOT NULL,
-  PRIMARY KEY (`session_id`,`topic_id`),
-  KEY `topic_id` (`topic_id`),
-  CONSTRAINT `Session_Topics_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
-  CONSTRAINT `Session_Topics_ibfk_2` FOREIGN KEY (`topic_id`) REFERENCES `Course_Topics` (`topic_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `Sessions` (
+  `session_id` char(36) NOT NULL DEFAULT uuid(),
+  `request_id` char(36) NOT NULL,
+  `modality` enum('In-Person','Online') NOT NULL,
+  `room_id` int(11) NOT NULL,
+  `meeting_link` text DEFAULT NULL,
+  `scheduled_time` datetime NOT NULL,
+  `status` enum('Scheduled','Completed','Cancelled') DEFAULT 'Scheduled',
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`session_id`),
+  UNIQUE KEY `request_id` (`request_id`),
+  KEY `room_id` (`room_id`),
+  CONSTRAINT `Sessions_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE CASCADE,
+  CONSTRAINT `Sessions_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `Rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `Session_Topics`
+-- Dumping data for table `Sessions`
 --
 
-LOCK TABLES `Session_Topics` WRITE;
-/*!40000 ALTER TABLE `Session_Topics` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Session_Topics` ENABLE KEYS */;
+LOCK TABLES `Sessions` WRITE;
+/*!40000 ALTER TABLE `Sessions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Sessions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `Tutee_Courses`
+--
+
+DROP TABLE IF EXISTS `Tutee_Courses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `Tutee_Courses` (
+  `user_id` char(36) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  PRIMARY KEY (`user_id`,`course_id`),
+  KEY `Tutee_Courses_ibfk_2` (`course_id`),
+  CONSTRAINT `Tutee_Courses_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `Tutee_Courses_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `Tutee_Courses`
+--
+
+LOCK TABLES `Tutee_Courses` WRITE;
+/*!40000 ALTER TABLE `Tutee_Courses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Tutee_Courses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `Tutor_Expertise`
+--
+
+DROP TABLE IF EXISTS `Tutor_Expertise`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `Tutor_Expertise` (
+  `user_id` char(36) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  PRIMARY KEY (`user_id`,`course_id`),
+  KEY `course_id` (`course_id`),
+  CONSTRAINT `Tutor_Expertise_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Tutor_Profiles` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `Tutor_Expertise_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `Tutor_Expertise`
+--
+
+LOCK TABLES `Tutor_Expertise` WRITE;
+/*!40000 ALTER TABLE `Tutor_Expertise` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Tutor_Expertise` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `Tutor_Profiles`
+--
+
+DROP TABLE IF EXISTS `Tutor_Profiles`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `Tutor_Profiles` (
+  `user_id` char(36) NOT NULL,
+  `bio` text DEFAULT NULL,
+  `rating_avg` decimal(3,2) DEFAULT 0.00,
+  PRIMARY KEY (`user_id`),
+  CONSTRAINT `Tutor_Profiles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `Tutor_Profiles`
+--
+
+LOCK TABLES `Tutor_Profiles` WRITE;
+/*!40000 ALTER TABLE `Tutor_Profiles` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Tutor_Profiles` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `Users`
+--
+
+DROP TABLE IF EXISTS `Users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `Users` (
+  `user_id` char(36) NOT NULL DEFAULT uuid(),
+  `email` varchar(255) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `contact_number` varchar(15) DEFAULT NULL,
+  `current_year_level` int(11) NOT NULL,
+  `program_code` varchar(15) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `email` (`email`),
+  KEY `fk_users_program` (`program_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `Users`
+--
+
+LOCK TABLES `Users` WRITE;
+/*!40000 ALTER TABLE `Users` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Users` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -492,7 +455,8 @@ CREATE TABLE `auth_sessions` (
 
 LOCK TABLES `auth_sessions` WRITE;
 /*!40000 ALTER TABLE `auth_sessions` DISABLE KEYS */;
-INSERT INTO `auth_sessions` VALUES ('mPReCuDDb0MZlYyFyk8Yg4LPIsxxdcr32fSSW6ar',NULL,'127.0.0.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0','eyJfdG9rZW4iOiJFOEVFUnByOGdnOGtTMDVMT2x5eXdKVktHZjJhWkNZUlpxbENrWXhKIiwiX2ZsYXNoIjp7Im9sZCI6W10sIm5ldyI6W119LCJfcHJldmlvdXMiOnsidXJsIjoiaHR0cDpcL1wvMTI3LjAuMC4xOjgwMDFcL2xvZ2luIiwicm91dGUiOiJsb2dpbiJ9fQ==',1777808831);
+INSERT INTO `auth_sessions` VALUES
+('bAYHaMpmP5Q81PQ6aFmTgZYewqowb2eaeoLF2VLu',NULL,'127.0.0.1','Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.118.1 Chrome/142.0.7444.265 Electron/39.8.8 Safari/537.36','eyJfdG9rZW4iOiJ5TGZFUkY4Vlp1NVFDTVFaSHFPRkJhelowUHlnU0dPZFd4UG5LeE93IiwiX2ZsYXNoIjp7Im9sZCI6W10sIm5ldyI6W119LCJfcHJldmlvdXMiOnsidXJsIjoiaHR0cDpcL1wvMTI3LjAuMC4xOjgwMDFcL2xvZ2luIiwicm91dGUiOiJsb2dpbiJ9fQ==',1778057313);
 /*!40000 ALTER TABLE `auth_sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -518,7 +482,13 @@ CREATE TABLE `cache` (
 
 LOCK TABLES `cache` WRITE;
 /*!40000 ALTER TABLE `cache` DISABLE KEYS */;
-INSERT INTO `cache` VALUES ('laravel-cache-jipetilla@up.edu.ph|127.0.0.1','i:1;',1777808827),('laravel-cache-jipetilla@up.edu.ph|127.0.0.1:timer','i:1777808827;',1777808827);
+INSERT INTO `cache` VALUES
+('laravel-cache-926b22864bb97779991a62047e5daf92303d77f1','i:3;',1778057350),
+('laravel-cache-926b22864bb97779991a62047e5daf92303d77f1:timer','i:1778057350;',1778057350),
+('laravel-cache-b8d50ffa13dc28030796cda46f90ca193022354a','i:1;',1778056740),
+('laravel-cache-b8d50ffa13dc28030796cda46f90ca193022354a:timer','i:1778056740;',1778056740),
+('laravel-cache-ea6445dc1772b0334c6f5322d2815ef0b31fcbca','i:8;',1778057334),
+('laravel-cache-ea6445dc1772b0334c6f5322d2815ef0b31fcbca:timer','i:1778057334;',1778057334);
 /*!40000 ALTER TABLE `cache` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -648,7 +618,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -657,7 +627,14 @@ CREATE TABLE `migrations` (
 
 LOCK TABLES `migrations` WRITE;
 /*!40000 ALTER TABLE `migrations` DISABLE KEYS */;
-INSERT INTO `migrations` VALUES (1,'0001_01_01_000000_create_users_table',1),(2,'0001_01_01_000001_create_cache_table',1),(3,'0001_01_01_000002_create_jobs_table',1),(4,'2026_05_03_113306_create_personal_access_tokens_table',2);
+INSERT INTO `migrations` VALUES
+(1,'0001_01_01_000000_create_users_table',1),
+(2,'0001_01_01_000001_create_cache_table',1),
+(3,'0001_01_01_000002_create_jobs_table',1),
+(4,'0001_01_01_000003_create_programs_table',1),
+(5,'0001_01_01_000004_create_custom_users_table',1),
+(6,'0001_01_01_000005_create_peerlink_domain_tables',1),
+(7,'2026_05_03_113306_create_personal_access_tokens_table',1);
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -718,7 +695,6 @@ LOCK TABLES `personal_access_tokens` WRITE;
 /*!40000 ALTER TABLE `personal_access_tokens` DISABLE KEYS */;
 /*!40000 ALTER TABLE `personal_access_tokens` ENABLE KEYS */;
 UNLOCK TABLES;
-
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -729,27 +705,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
---
--- Table structure for table `Notifications`
---
-
-DROP TABLE IF EXISTS `Notifications`;
-CREATE TABLE `Notifications` (
-  `notification_id` char(36) NOT NULL DEFAULT (uuid()),
-  `user_id` char(36) NOT NULL,
-  `type` varchar(50) NOT NULL,
-  `message` text NOT NULL,
-  `request_id` char(36) DEFAULT NULL,
-  `is_read` tinyint(1) NOT NULL DEFAULT 0,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`notification_id`),
-  KEY `idx_notif_user` (`user_id`),
-  KEY `idx_notif_request` (`request_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-LOCK TABLES `Notifications` WRITE;
-/*!40000 ALTER TABLE `Notifications` DISABLE KEYS */;
-/*!40000 ALTER TABLE `Notifications` ENABLE KEYS */;
-UNLOCK TABLES;
-
--- Dump completed on 2026-05-05 13:28:47
+-- Dump completed on 2026-05-06 16:51:02
