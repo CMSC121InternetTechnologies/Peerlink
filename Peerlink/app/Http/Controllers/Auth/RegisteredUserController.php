@@ -28,7 +28,7 @@ class RegisteredUserController extends Controller
             'last_name' => ['required', 'string', 'max:100'],
             'program_code' => ['required', 'string', 'exists:Programs,program_code'],
             'current_year_level' => ['required', 'integer', 'min:1'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class, 'regex:/@up\.edu\.ph$/i'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 

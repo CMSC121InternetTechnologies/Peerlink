@@ -37,7 +37,7 @@
             </select>
 
             <label>Current Year Level (e.g., 1, 2, 3)</label>
-            <input type="number" name="current_year_level" value="{{ old('current_year_level') }}" required min="1" max="5">
+            <input type="number" name="current_year_level" value="{{ old('current_year_level') }}" required min="1" max="100">
 
             <label>Email Address</label>
             <input type="email" name="email" value="{{ old('email') }}" required>

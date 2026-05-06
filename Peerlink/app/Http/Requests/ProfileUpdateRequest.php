@@ -14,7 +14,7 @@ class ProfileUpdateRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'contact_number' => ['nullable', 'string', 'max:15'],
-            'current_year_level' => ['required', 'integer', 'min:1'],
+            'current_year_level' => ['required', 'integer', 'min:1', 'max:100'],
             'email' => [
                 'required',
                 'string',
