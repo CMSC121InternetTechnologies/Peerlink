@@ -873,6 +873,12 @@ function renderObTags() {
 }
 
 async function obFinish() {
+  // Check if the user selected at least one course
+  if (obCourses.length === 0) {
+    showToast('Please add at least one course before finishing.');
+    return;
+  }
+
   const btn = document.getElementById('obFinishBtn');
   btn.disabled   = true;
   btn.textContent = 'Saving…';

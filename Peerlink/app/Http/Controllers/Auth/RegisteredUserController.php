@@ -27,7 +27,7 @@ class RegisteredUserController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'program_code' => ['required', 'string', 'exists:Programs,program_code'],
-            'current_year_level' => ['required', 'integer', 'min:1'],
+            'current_year_level' => ['required', 'integer', 'min:1', 'max:100'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
