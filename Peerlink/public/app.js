@@ -126,20 +126,20 @@ async function fetchProfile() {
     if (!res.ok) return;
     const data = await res.json();
 
+    console.log("PROFILE DATA FROM DATABASE:", data);
+
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
+    userProfile.tuteeCourses = data.tuteeCourses || []; 
     availableRooms           = data.rooms || [];
 
     updateProfileDisplay();
     populateGroupRoomSelect();
 
-    // Tutor dashboard stats
     document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
     document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
     document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
-  } catch {
-    // silently fail; stats stay as '—'
-  }
+  } catch {}
 }
 
 function toggleEditMode(isEdit) {
@@ -190,6 +190,7 @@ async function saveProfile(event) {
       }),
     });
     if (!res.ok) throw new Error();
+
     showToast('Profile saved!');
     fetchProfile();
   } catch {
@@ -197,16 +198,17 @@ async function saveProfile(event) {
     return;
   }
 
-  updateProfileDisplay();
   toggleEditMode(false);
 }
 
 function updateProfileDisplay() {
   document.getElementById('bioDisplay').textContent = userProfile.bio || 'No bio added yet.';
-  document.getElementById('tutorCoursesDisplay').innerHTML =
-    userProfile.tutorCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
-  document.getElementById('tuteeCoursesDisplay').innerHTML =
-    userProfile.tuteeCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
+
+  const tutorDisplay = document.getElementById('tutorCoursesDisplay');
+  if (tutorDisplay) tutorDisplay.innerHTML = userProfile.tutorCourses.length > 0 ? userProfile.tutorCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join(''): '<p style="color: var(--text-muted); font-size: 0.9rem;">No courses added yet.</p>';
+
+  const tuteeDisplay = document.getElementById('tuteeCoursesDisplay');
+  if (tuteeDisplay) tuteeDisplay.innerHTML = userProfile.tuteeCourses.length > 0 ? userProfile.tuteeCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('') : '<p style="color: var(--text-muted); font-size: 0.9rem;">No courses added yet.</p>';
 }
 
 // ===== DELETE ACCOUNT =====
@@ -334,9 +336,7 @@ function openSessionModal(id) {
   document.getElementById('modalName').textContent = tutor.name;
   document.getElementById('modalSub').textContent  = tutor.degree || '';
   
-  const avatarEl = document.getElementById('modalAvatar');
-  if (tutor.hasPhoto && tutor.id) avatarEl.innerHTML = `<img src="/api/user/photo/${tutor.id}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;">`;
-  else avatarEl.textContent = tutor.initials || tutor.name[0];
+  document.getElementById('modalAvatar').textContent = tutor.initials || tutor.name[0];
 
   const sel = document.getElementById('sessionCourse');
   sel.innerHTML = '<option value="" disabled selected>Select a course</option>' +
@@ -528,7 +528,7 @@ async function claimBroadcast(id) {
     broadcastRequests = broadcastRequests.filter(r => r.id !== id);
     renderBroadcastRequests();
     showToast('Broadcast claimed and session scheduled!');
-    fetchProfile(); // update upcoming sessions count
+    fetchProfile();
   } catch {
     showToast('Action failed. Please try again.');
   }
