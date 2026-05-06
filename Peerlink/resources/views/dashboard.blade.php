@@ -28,11 +28,6 @@
       <a href="#" class="nav-link" id="navDashboard"   onclick="switchView('dashboard')">Explore Tutors</a>
       <a href="#" class="nav-link" id="navMyRequests"  onclick="switchView('myRequests')">My Requests</a>
       <a href="#" class="nav-link" id="navProfile"     onclick="switchView('profile')">Profile</a>
-      <form method="POST" action="{{ route('logout') }}" style="display:inline;">
-        @csrf
-        <a href="{{ route('logout') }}" class="nav-link"
-           onclick="event.preventDefault(); this.closest('form').submit();">Log out</a>
-      </form>
     </div>
 
     <!-- Notification Bell -->
@@ -75,6 +70,12 @@
         Tutee
       </button>
     </div>
+
+    <!-- Logout Button -->
+    <form method="POST" action="{{ route('logout') }}" style="display: flex; align-items: center;">
+      @csrf
+      <button type="submit" class="btn-logout" title="Log out safely">Log out</button>
+    </form>
   </nav>
 
   <main class="page">
