@@ -48,6 +48,7 @@ class RequestController extends Controller
         if ($role === 'broadcast') {
             $requests = TutoringRequest::whereNull('tutor_id')
                 ->where('status', 'Pending')
+                ->where('student_id', '!=', $user->user_id)  // M7: hide own broadcasts
                 ->with(['student', 'course'])
                 ->orderByDesc('created_at')
                 ->get();
@@ -224,21 +225,30 @@ class RequestController extends Controller
                 ?? Room::where('room_type', 'Physical')->first()?->room_id
                 ?? 1;
 
-            $req->status = 'Approved';
-            $req->save();
-
             try {
-                $session = TutoringSession::create([
-                    'request_id'     => $req->request_id,
-                    'modality'       => $req->counter_proposed_modality ?? 'In-Person',
-                    'room_id'        => $roomId,
-                    'meeting_link'   => null,
-                    'scheduled_time' => $req->counter_proposed_time ?? now()->addDays(3)->format('Y-m-d H:i:s'),
-                    'status'         => 'Scheduled',
-                ]);
-                $this->addParticipants($session->session_id, $req->tutor_id, $req->student_id);
+                DB::transaction(function () use ($req, $roomId, $user) {
+                    $req->status = 'Approved';
+                    $req->save();
+
+                    $session = TutoringSession::create([
+                        'request_id'     => $req->request_id,
+                        'modality'       => $req->counter_proposed_modality ?? 'In-Person',
+                        'room_id'        => $roomId,
+                        'meeting_link'   => null,
+                        'scheduled_time' => $req->counter_proposed_time
+                            ? \Carbon\Carbon::parse($req->counter_proposed_time)->format('Y-m-d H:i:s')
+                            : now()->addDays(3)->format('Y-m-d H:i:s'),
+                        'status'         => 'Scheduled',
+                    ]);
+                    $this->addParticipants($session->session_id, $req->tutor_id, $req->student_id);
+                });
             } catch (QueryException $e) {
-                return response()->json(['error' => 'A session already exists for this request.'], 422);
+                $isDuplicate = str_contains($e->getMessage(), '1062') || str_contains($e->getMessage(), 'Duplicate');
+                return response()->json([
+                    'error' => $isDuplicate
+                        ? 'A session already exists for this request.'
+                        : 'Failed to create session. Please try again.',
+                ], 422);
             }
 
             if ($req->tutor_id) {
@@ -256,6 +266,8 @@ class RequestController extends Controller
         }
 
         // --- Student cancels their own pending/counter-proposed request ---
+        // Row is kept with status=Cancelled so the tutee sees the badge.
+        // Tutor's incoming list filters by Pending only, so it disappears for them.
         if ($action === 'cancel') {
             if ($req->student_id !== $user->user_id) {
                 return response()->json(['error' => 'Unauthorized'], 403);
@@ -264,8 +276,19 @@ class RequestController extends Controller
                 return response()->json(['error' => 'Only pending or counter-proposed requests can be cancelled.'], 422);
             }
 
-            Notification::where('request_id', $req->request_id)->delete();
-            $req->delete();
+            $req->status = 'Cancelled';
+            $req->save();
+
+            if ($req->tutor_id) {
+                $studentName = $user->first_name . ' ' . $user->last_name;
+                Notification::create([
+                    'user_id'    => $req->tutor_id,
+                    'type'       => 'request_cancelled',
+                    'message'    => "{$studentName} cancelled their tutoring request for {$req->course?->course_code}.",
+                    'request_id' => $req->request_id,
+                    'is_read'    => false,
+                ]);
+            }
 
             return response()->json(['message' => 'Request cancelled.']);
         }
@@ -298,7 +321,7 @@ class RequestController extends Controller
             }
 
             $req->status                   = 'CounterProposed';
-            $req->counter_proposed_time    = $validated['counter_time'];
+            $req->counter_proposed_time    = \Carbon\Carbon::parse($validated['counter_time'])->format('Y-m-d H:i:s');
             $req->counter_proposed_message = $validated['counter_message'] ?? null;
             $req->counter_proposed_modality = $validated['counter_modality'] ?? null;
             $req->counter_proposed_room_id  = $validated['counter_room_id'] ?? null;
@@ -317,28 +340,39 @@ class RequestController extends Controller
         }
 
         // Accept or Claim: create session
-        if ($isBroadcast) {
-            $req->tutor_id = $user->user_id;
-        }
-        $req->status = 'Approved';
-        $req->save();
-
         $roomId = $validated['room_id']
             ?? Room::where('room_type', 'Physical')->first()?->room_id
             ?? 1;
 
+        $scheduledAt = $validated['scheduled_time']
+            ? \Carbon\Carbon::parse($validated['scheduled_time'])->format('Y-m-d H:i:s')
+            : now()->addDays(3)->format('Y-m-d H:i:s');
+
         try {
-            $session = TutoringSession::create([
-                'request_id'     => $req->request_id,
-                'modality'       => $validated['modality'] ?? 'In-Person',
-                'room_id'        => $roomId,
-                'meeting_link'   => $validated['meeting_link'] ?? null,
-                'scheduled_time' => $validated['scheduled_time'] ?? now()->addDays(3)->format('Y-m-d H:i:s'),
-                'status'         => 'Scheduled',
-            ]);
-            $this->addParticipants($session->session_id, $user->user_id, $req->student_id);
+            DB::transaction(function () use ($req, $user, $isBroadcast, $validated, $roomId, $scheduledAt) {
+                if ($isBroadcast) {
+                    $req->tutor_id = $user->user_id;
+                }
+                $req->status = 'Approved';
+                $req->save();
+
+                $session = TutoringSession::create([
+                    'request_id'     => $req->request_id,
+                    'modality'       => $validated['modality'] ?? 'In-Person',
+                    'room_id'        => $roomId,
+                    'meeting_link'   => $validated['meeting_link'] ?? null,
+                    'scheduled_time' => $scheduledAt,
+                    'status'         => 'Scheduled',
+                ]);
+                $this->addParticipants($session->session_id, $user->user_id, $req->student_id);
+            });
         } catch (QueryException $e) {
-            return response()->json(['error' => 'A session already exists for this request.'], 422);
+            $isDuplicate = str_contains($e->getMessage(), '1062') || str_contains($e->getMessage(), 'Duplicate');
+            return response()->json([
+                'error' => $isDuplicate
+                    ? 'A session already exists for this request.'
+                    : 'Failed to create session. Please try again.',
+            ], 422);
         }
 
         $tutorName = $user->first_name . ' ' . $user->last_name;
@@ -386,7 +420,7 @@ class RequestController extends Controller
             'modality'       => $validated['modality'],
             'room_id'        => $roomId,
             'meeting_link'   => $validated['meeting_link'] ?? null,
-            'scheduled_time' => $validated['scheduled_time'],
+            'scheduled_time' => \Carbon\Carbon::parse($validated['scheduled_time'])->format('Y-m-d H:i:s'),
             'status'         => 'Scheduled',
         ]);
 

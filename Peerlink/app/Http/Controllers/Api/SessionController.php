@@ -245,12 +245,22 @@ class SessionController extends Controller
         $myRole = $s->participantUsers
             ->firstWhere('user_id', $userId)?->pivot->role ?? 'Tutee';
 
-        $partner = $s->participantUsers->first(fn($u) => $u->user_id !== $userId);
-        $partnerName = $partner
-            ? ($partner->first_name . ' ' . $partner->last_name)
-            : ($myRole === 'Tutor' ? 'Group Session' : 'Unknown');
-
         $isGroup = str_starts_with($s->request?->message ?? '', '[GROUP]');
+
+        // For group sessions always show the tutor's name as the partner.
+        // For 1-on-1 sessions find the other participant.
+        if ($isGroup) {
+            $tutorUser   = $s->participantUsers->firstWhere('pivot.role', 'Tutor');
+            $partnerName = $tutorUser
+                ? ($tutorUser->first_name . ' ' . $tutorUser->last_name)
+                : 'Group Session';
+            $partner     = $tutorUser;
+        } else {
+            $partner     = $s->participantUsers->first(fn($u) => $u->user_id !== $userId);
+            $partnerName = $partner
+                ? ($partner->first_name . ' ' . $partner->last_name)
+                : 'Unknown';
+        }
 
         $hasReview = SessionReview::where('session_id', $s->session_id)
             ->where('reviewer_id', $userId)
