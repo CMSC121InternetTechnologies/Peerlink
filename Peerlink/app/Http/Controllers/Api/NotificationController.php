@@ -33,15 +33,15 @@ class NotificationController extends Controller
         ]);
     }
 
-    // PATCH /api/notifications/read  — mark all as read
+    // PATCH /api/notifications/read  — mark all unread notifications as read
     public function markAllRead(Request $request)
     {
         $user = $request->user();
 
-        Notification::where('user_id', $user->user_id)
+        $updated = Notification::where('user_id', $user->user_id)
             ->where('is_read', false)
             ->update(['is_read' => true]);
 
-        return response()->json(['message' => 'Notifications marked as read.']);
+        return response()->json(['message' => 'Notifications marked as read.', 'updated' => $updated]);
     }
 }
