@@ -6,9 +6,7 @@
   <title>PeerLink | Profile</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-
-
- @vite(['resources/css/style.css', 'resources/js/app.js'])
+  <link rel="stylesheet" href="{{ asset('style.css') }}"/>
 </head>
 
 
@@ -205,8 +203,6 @@
 
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
-
-    
+    <script src="{{ asset('app.js') }}?v={{ filemtime(public_path('app.js')) }}"></script>
 </body>
-
 </html>

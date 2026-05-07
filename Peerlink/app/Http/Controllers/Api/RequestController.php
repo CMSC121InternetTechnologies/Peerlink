@@ -323,23 +323,22 @@ class RequestController extends Controller
         $req->status = 'Approved';
         $req->save();
 
-        $roomId = $validated['room_id']
-            ?? Room::where('room_type', 'Physical')->first()?->room_id
-            ?? 1;
+        $modality = $validated['modality'] ?? 'In-Person';
+        $roomId = $validated['room_id'];
 
-        try {
-            $session = TutoringSession::create([
-                'request_id'     => $req->request_id,
-                'modality'       => $validated['modality'] ?? 'In-Person',
-                'room_id'        => $roomId,
-                'meeting_link'   => $validated['meeting_link'] ?? null,
-                'scheduled_time' => $validated['scheduled_time'] ?? now()->addDays(3)->format('Y-m-d H:i:s'),
-                'status'         => 'Scheduled',
-            ]);
-            $this->addParticipants($session->session_id, $user->user_id, $req->student_id);
-        } catch (QueryException $e) {
-            return response()->json(['error' => 'A session already exists for this request.'], 422);
+        if (!$roomId) {
+            $targetType = ($modality === 'Online') ? 'Virtual' : 'Physical';
+            $roomId = Room::where('room_type', $targetType)->first()?->room_id ?? 1;
         }
+
+        $session = TutoringSession::create([
+            'request_id'     => $req->request_id,
+            'modality'       => $validated['modality'] ?? 'In-Person',
+            'room_id'        => $roomId,
+            'meeting_link'   => $validated['meeting_link'] ?? null,
+            'scheduled_time' => $validated['scheduled_time'] ?? now()->addDays(3)->format('Y-m-d H:i:s'),
+            'status'         => 'Scheduled',
+        ]);
 
         $tutorName = $user->first_name . ' ' . $user->last_name;
         Notification::create([
@@ -381,24 +380,18 @@ class RequestController extends Controller
             'status'     => 'Approved',
         ]);
 
-        $session = TutoringSession::create([
-            'request_id'     => $req->request_id,
-            'modality'       => $validated['modality'],
-            'room_id'        => $roomId,
-            'meeting_link'   => $validated['meeting_link'] ?? null,
-            'scheduled_time' => $validated['scheduled_time'],
-            'status'         => 'Scheduled',
-        ]);
+        DB::transaction(function () use ($req, $roomId, $validated, $user) {
+            $session = TutoringSession::create([
+                'request_id'     => $req->request_id,
+                'modality'       => $validated['modality'],
+                'room_id'        => $roomId,
+                'meeting_link'   => $validated['meeting_link'] ?? null,
+                'scheduled_time' => $validated['scheduled_time'],
+                'status'         => 'Scheduled',
+            ]);
 
-        // Tutor is the host; no student participant yet (students join later)
-        DB::table('Session_Participants')->insert([
-            'participation_id' => (string) Str::uuid(),
-            'session_id'       => $session->session_id,
-            'user_id'          => $user->user_id,
-            'role'             => 'Tutor',
-            'has_attended'     => null,
-            'joined_at'        => now(),
-        ]);
+            $this->addParticipants($session->session_id, $user->user_id, $req->student_id);
+        });
 
         return response()->json(['message' => 'Group session posted.', 'session_id' => $session->session_id], 201);
     }

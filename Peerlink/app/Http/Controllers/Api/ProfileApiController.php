@@ -89,7 +89,7 @@ class ProfileApiController extends Controller
             $tutorProfile->save();
         }
 
-        if (array_key_exists('tutorCourses', $validated)) {
+        if ($request->has('tutorCourses')) {
             $courseIds = Course::whereIn('course_code', $validated['tutorCourses'] ?? [])
                 ->pluck('course_id')
                 ->toArray();

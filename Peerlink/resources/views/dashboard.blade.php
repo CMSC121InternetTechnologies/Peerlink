@@ -16,13 +16,14 @@
     window.__onboarding = {{ $onboarding ? 'true' : 'false' }};
     window.__courses  = {!! json_encode($courses->map(fn($c) => ['code' => $c->course_code, 'name' => $c->course_name])->values()) !!};
     window.__programs = {!! json_encode($programs->map(fn($p) => ['code' => $p->program_code])->values()) !!};
-    window.__authUser = {
-      firstName:  '{{ addslashes(auth()->user()->first_name) }}',
-      lastName:   '{{ addslashes(auth()->user()->last_name) }}',
-      programCode:'{{ auth()->user()->program_code }}',
-      yearLevel:  {{ auth()->user()->current_year_level ?? 'null' }},
-      contact:    '{{ addslashes(auth()->user()->contact_number ?? '') }}',
-    };
+    window.__authUser = @js([
+        'firstName'   => auth()->user()->first_name,
+        'lastName'    => auth()->user()->last_name,
+        'programCode' => auth()->user()->program_code,
+        'yearLevel'   => auth()->user()->current_year_level,
+        'contact'     => auth()->user()->contact_number,
+    ]);
+    window.__courses = @js($courses->map->only(['course_code', 'course_name'])->values());
   </script>
 
   <!-- Navigation Bar -->

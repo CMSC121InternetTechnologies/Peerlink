@@ -1196,11 +1196,14 @@ async function changePassword() {
 }
 
 // ===== PHASE 1.1: ACCEPT MODAL =====
-function populateAcceptRoomSelect() {
+function populateAcceptRoomSelect(modality = 'In-Person') {
   const sel = document.getElementById('acceptRoom');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— auto-assign —</option>' +
-    availableRooms.map(r => `<option value="${r.room_id}">${esc(r.room_name)} (${r.room_type})</option>`).join('');
+
+  const targetType = modality === 'Online' ? 'Virtual' : 'Physical';
+  const filteredRooms = availableRooms.filter(r => r.room_type === targetType);
+
+  sel.innerHTML = '<option value="">— auto-assign —</option>' + filteredRooms.map(r => `<option value="${r.room_id}">${esc(r.room_name)}</option>`).join('');
 }
 
 function openAcceptModal(req) {
@@ -1228,8 +1231,11 @@ function closeAcceptModal() {
 
 function toggleAcceptLink() {
   const modality = document.getElementById('acceptModality').value;
-  document.getElementById('acceptRoomWrap').style.display = modality === 'In-Person' ? 'block' : 'none';
-  document.getElementById('acceptLinkWrap').style.display = modality === 'Online'    ? 'block' : 'none';
+
+  document.getElementById('acceptRoomWrap').style.display = 'block'; 
+  document.getElementById('acceptLinkWrap').style.display = modality === 'Online' ? 'block' : 'none';
+
+  populateAcceptRoomSelect(modality);
 }
 
 async function submitAccept() {
