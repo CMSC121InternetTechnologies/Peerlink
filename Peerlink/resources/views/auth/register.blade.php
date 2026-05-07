@@ -49,8 +49,8 @@
             <input type="text" name="contact_number" value="{{ old('contact_number') }}" required placeholder="+63 912-345-6789" style="width: 100%; margin-bottom: 0.5rem;">
 
             <label>Email Address</label>
-            <input type="email" name="email" value="{{ old('email') }}" required>
-
+            <input type="email" name="email" value="{{ old('email') }}" required placeholder="student@up.edu.ph">
+           
             <label>Password</label>
             <input type="password" name="password" required>
 

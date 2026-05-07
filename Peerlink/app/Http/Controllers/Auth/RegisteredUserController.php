@@ -30,8 +30,9 @@ class RegisteredUserController extends Controller
             'contact_number' => ['required', 'string', 'regex:/^\+63[\s\-]?9\d{2}[\s\-]?\d{3}[\s\-]?\d{4}$/'],
             'program_code' => ['required', 'string', 'exists:Programs,program_code'],
             'current_year_level' => ['required', 'integer', 'min:1', 'max:100'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255','ends_with:@up.edu.ph', 'unique:'.User::class],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255','min: 3', 'ends_with:@up.edu.ph', 'unique:'.User::class],
             'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            'email.ends_with' => ['Please use a valid UP webmail address (@up.edu.ph or @edu.ph) to register.'],
         ]);
         
         $cleaned_contact = str_replace([' ', '-'], '', $request->contact_number);
