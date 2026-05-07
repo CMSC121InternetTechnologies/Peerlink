@@ -177,6 +177,7 @@
             <option value="CounterProposed">Counter-Proposed</option>
             <option value="Approved">Approved</option>
             <option value="Declined">Declined</option>
+            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
       </div>
@@ -635,6 +636,19 @@
       <button class="modal-close" onclick="closeTutorProfile()">✕</button>
       <div id="tutorProfileContent">
         <div style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRMATION MODAL ===== -->
+  <div class="modal-overlay" id="confirmModalOverlay" onclick="closeConfirmModal()">
+    <div class="confirm-modal" onclick="event.stopPropagation()">
+      <div class="confirm-modal-icon" id="confirmIcon"></div>
+      <h2 class="confirm-modal-title" id="confirmTitle"></h2>
+      <p class="confirm-modal-message" id="confirmMessage"></p>
+      <div class="confirm-modal-actions">
+        <button class="btn-outline confirm-btn-cancel" id="confirmCancelBtn" onclick="closeConfirmModal()">Cancel</button>
+        <button class="confirm-btn-ok" id="confirmOkBtn" onclick="_executeConfirm()">Confirm</button>
       </div>
     </div>
   </div>

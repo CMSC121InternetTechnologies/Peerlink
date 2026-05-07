@@ -30,7 +30,17 @@ class RegisteredUserController extends Controller
             'contact_number' => ['required', 'string', 'regex:/^\+63[\s\-]?9\d{2}[\s\-]?\d{3}[\s\-]?\d{4}$/'],
             'program_code' => ['required', 'string', 'exists:Programs,program_code'],
             'current_year_level' => ['required', 'integer', 'min:1', 'max:100'],
+<<<<<<< HEAD
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class,
+                function ($attribute, $value, $fail) {
+                    if (!str_ends_with($value, '@up.edu.ph') && !str_ends_with($value, '@edu.ph')) {
+                        $fail('Only UP email addresses (@up.edu.ph or @edu.ph) are allowed.');
+                    }
+                },
+            ],
+=======
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+>>>>>>> 8d2aa66cdd8ba1bd1784d05fec117c887eee5968
             'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
         

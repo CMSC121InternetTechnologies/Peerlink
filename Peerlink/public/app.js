@@ -1,3 +1,38 @@
+// ===== CONFIRM MODAL =====
+let _confirmCallback = null;
+
+function showConfirmModal(title, message, onConfirm, opts = {}) {
+  const {
+    icon         = '⚠️',
+    confirmLabel = 'Confirm',
+    cancelLabel  = 'Cancel',
+    destructive  = true,
+  } = opts;
+
+  document.getElementById('confirmIcon').textContent        = icon;
+  document.getElementById('confirmTitle').textContent       = title;
+  document.getElementById('confirmMessage').textContent     = message;
+  document.getElementById('confirmCancelBtn').textContent   = cancelLabel;
+
+  const okBtn = document.getElementById('confirmOkBtn');
+  okBtn.textContent       = confirmLabel;
+  okBtn.style.background  = destructive ? 'var(--coral)' : 'var(--teal)';
+
+  _confirmCallback = onConfirm;
+  document.getElementById('confirmModalOverlay').classList.add('open');
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirmModalOverlay').classList.remove('open');
+  _confirmCallback = null;
+}
+
+function _executeConfirm() {
+  const cb = _confirmCallback;
+  closeConfirmModal();
+  if (cb) cb();
+}
+
 // ===== UTILITIES =====
 function esc(str) {
   if (str == null) return '';
@@ -470,23 +505,37 @@ function renderTutorRequests() {
 }
 
 async function respondTutorRequest(id, action) {
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showToast(err.error || 'Action failed.');
-      return;
+  const doRequest = async () => {
+    try {
+      const res = await fetch(`/api/requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || 'Action failed.');
+        return;
+      }
+      pendingRequests = pendingRequests.filter(r => r.id !== id);
+      renderTutorRequests();
+      showToast(action === 'accept' ? 'Session accepted!' : 'Request declined.');
+      fetchNotifications();
+      if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
+    } catch {
+      showToast('Action failed. Please try again.');
     }
-    pendingRequests = pendingRequests.filter(r => r.id !== id);
-    renderTutorRequests();
-    showToast(action === 'accept' ? 'Session accepted!' : 'Request declined.');
-    if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
-  } catch {
-    showToast('Action failed. Please try again.');
+  };
+
+  if (action === 'decline') {
+    showConfirmModal(
+      'Decline Request',
+      'Decline this tutoring request? The student will be notified.',
+      doRequest,
+      { icon: '✖️', confirmLabel: 'Decline', cancelLabel: 'Go Back', destructive: true }
+    );
+  } else {
+    doRequest();
   }
 }
 
@@ -690,6 +739,7 @@ function renderMyRequests() {
     Declined:        'var(--coral)',
     Expired:         '#aaa',
     CounterProposed: 'var(--purple)',
+    Cancelled:       '#888',
   };
 
   list.innerHTML = shown.map(req => {
@@ -749,21 +799,35 @@ function renderMyRequests() {
 }
 
 async function respondToCounter(requestId, action) {
-  try {
-    const res = await fetch(`/api/requests/${requestId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showToast(err.error || 'Action failed.');
-      return;
+  const doRequest = async () => {
+    try {
+      const res = await fetch(`/api/requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || 'Action failed.');
+        return;
+      }
+      showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
+      fetchMyRequests();
+      fetchNotifications();
+    } catch {
+      showToast('Action failed. Please try again.');
     }
-    showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
-    fetchMyRequests();
-  } catch {
-    showToast('Action failed. Please try again.');
+  };
+
+  if (action === 'student_decline') {
+    showConfirmModal(
+      'Decline Proposal',
+      'Decline the tutor\'s proposed schedule? This request will be marked as declined.',
+      doRequest,
+      { icon: '✖️', confirmLabel: 'Decline Proposal', cancelLabel: 'Go Back', destructive: true }
+    );
+  } else {
+    doRequest();
   }
 }
 
@@ -834,12 +898,14 @@ function renderNotifications(notifications, unreadCount) {
     list.innerHTML = `<p class="notif-empty">No notifications yet.</p>`;
     return;
   }
+  const SESSION_TYPES = new Set(['session_completed', 'session_cancelled']);
   list.innerHTML = notifications.map(n => {
     const time = n.created_at
       ? new Date(n.created_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
       : '';
+    const targetView = SESSION_TYPES.has(n.type) ? 'sessions' : 'requests';
     return `
-      <div class="notif-item${n.is_read ? '' : ' notif-unread'}">
+      <div class="notif-item${n.is_read ? '' : ' notif-unread'}" style="cursor:pointer" onclick="notifNavigate('${esc(targetView)}')">
         <div class="notif-msg">${esc(n.message)}</div>
         <div class="notif-time">${time}</div>
       </div>`;
@@ -853,14 +919,22 @@ function toggleNotifDropdown() {
 }
 
 async function markAllNotificationsRead() {
+  document.getElementById('notifBadge').style.display = 'none';
+  const list = document.getElementById('notifList');
+  if (list) list.innerHTML = '<p class="notif-empty">No new notifications.</p>';
   try {
     await fetch('/api/notifications/read', {
       method: 'PATCH',
       headers: { 'X-CSRF-TOKEN': getCsrfToken() },
     });
-    document.getElementById('notifBadge').style.display = 'none';
-    document.querySelectorAll('.notif-unread').forEach(el => el.classList.remove('notif-unread'));
+    fetchNotifications();
   } catch { /* ignore */ }
+}
+
+function notifNavigate(view) {
+  notifDropdownOpen = false;
+  document.getElementById('notifDropdown').classList.remove('open');
+  switchView(view);
 }
 
 // ===== US_06 + US_07: ONBOARDING =====
@@ -1278,32 +1352,46 @@ function renderSessions() {
 }
 
 async function completeSession(id) {
-  if (!confirm('Mark this session as completed?')) return;
-  try {
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'complete' }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-    showToast('Session marked as completed!');
-    fetchSessions();
-    fetchProfile();
-  } catch { showToast('Action failed.'); }
+  showConfirmModal(
+    'Mark as Completed',
+    'Confirm this session is done? Students will be prompted to leave a review.',
+    async () => {
+      try {
+        const res = await fetch(`/api/sessions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'complete' }),
+        });
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+        showToast('Session marked as completed!');
+        fetchSessions();
+        fetchProfile();
+        fetchNotifications();
+      } catch { showToast('Action failed.'); }
+    },
+    { icon: '✅', confirmLabel: 'Mark Complete', cancelLabel: 'Not Yet', destructive: false }
+  );
 }
 
 async function cancelSession(id) {
-  if (!confirm('Cancel this session? All participants will be notified.')) return;
-  try {
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'cancel' }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-    showToast('Session cancelled.');
-    fetchSessions();
-  } catch { showToast('Action failed.'); }
+  showConfirmModal(
+    'Cancel Session',
+    'This session will be cancelled and all participants will be notified.',
+    async () => {
+      try {
+        const res = await fetch(`/api/sessions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'cancel' }),
+        });
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+        showToast('Session cancelled.');
+        fetchSessions();
+        fetchNotifications();
+      } catch { showToast('Action failed.'); }
+    },
+    { icon: '🚫', confirmLabel: 'Yes, Cancel Session', cancelLabel: 'Keep it', destructive: true }
+  );
 }
 
 // ===== PHASE 2.2: BROWSE OPEN GROUP SESSIONS =====
@@ -1366,31 +1454,45 @@ async function joinSession(id) {
 
 // ===== PHASE 2.3: CANCEL REQUEST =====
 async function cancelRequest(id) {
-  if (!confirm('Cancel this request?')) return;
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'cancel' }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-    showToast('Request cancelled.');
-    fetchMyRequests();
-  } catch { showToast('Failed to cancel request.'); }
+  showConfirmModal(
+    'Cancel Request',
+    'Cancel this request? This cannot be undone.',
+    async () => {
+      try {
+        const res = await fetch(`/api/requests/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'cancel' }),
+        });
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+        showToast('Request cancelled.');
+        fetchMyRequests();
+        fetchNotifications();
+      } catch { showToast('Failed to cancel request.'); }
+    },
+    { icon: '🗑️', confirmLabel: 'Yes, Cancel', cancelLabel: 'Keep it', destructive: true }
+  );
 }
 
 async function declineIncomingRequest(id) {
-  if (!confirm('Decline this request?')) return;
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'decline' }),
-    });
-    if (!res.ok) { const e = await res.json(); showToast(e.error || 'Failed.'); return; }
-    showToast('Request declined.');
-    fetchMyRequests();
-  } catch { showToast('Failed to decline request.'); }
+  showConfirmModal(
+    'Decline Request',
+    'Are you sure you want to decline this tutoring request? The student will be notified.',
+    async () => {
+      try {
+        const res = await fetch(`/api/requests/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'decline' }),
+        });
+        if (!res.ok) { const e = await res.json(); showToast(e.error || 'Failed.'); return; }
+        showToast('Request declined.');
+        fetchMyRequests();
+        fetchNotifications();
+      } catch { showToast('Failed to decline request.'); }
+    },
+    { icon: '✖️', confirmLabel: 'Decline', cancelLabel: 'Go Back', destructive: true }
+  );
 }
 
 function openAcceptFromMyRequests(id) {
@@ -1451,6 +1553,7 @@ renderMyRequests = function() {
     Declined:        'var(--coral)',
     Expired:         '#aaa',
     CounterProposed: 'var(--purple)',
+    Cancelled:       '#888',
   };
 
   list.innerHTML = `

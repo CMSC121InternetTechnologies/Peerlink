@@ -126,6 +126,22 @@ class RequestController extends Controller
         ]);
 
         $course  = Course::where('course_code', $validated['course_code'])->firstOrFail();
+
+        // Prevent duplicate active requests
+        $duplicate = TutoringRequest::where('student_id', $user->user_id)
+            ->where('course_id', $course->course_id)
+            ->whereIn('status', ['Pending', 'CounterProposed'])
+            ->when(
+                $validated['tutor_id'] ?? null,
+                fn($q, $tid) => $q->where('tutor_id', $tid),
+                fn($q)        => $q->whereNull('tutor_id')
+            )
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json(['error' => 'You already have a pending request for this course.'], 422);
+        }
+
         $message = $validated['message'] ?? '';
         if (!empty($validated['preferred_date'])) {
             $message = '[Preferred: ' . $validated['preferred_date'] . '] ' . $message;
@@ -239,7 +255,7 @@ class RequestController extends Controller
             return response()->json(['message' => 'Counter-proposal accepted and session scheduled.']);
         }
 
-        // --- Student cancels their own pending request ---
+        // --- Student cancels their own pending/counter-proposed request ---
         if ($action === 'cancel') {
             if ($req->student_id !== $user->user_id) {
                 return response()->json(['error' => 'Unauthorized'], 403);
@@ -248,19 +264,8 @@ class RequestController extends Controller
                 return response()->json(['error' => 'Only pending or counter-proposed requests can be cancelled.'], 422);
             }
 
-            $req->status = 'Expired';
-            $req->save();
-
-            if ($req->tutor_id && $req->tutor_id !== $user->user_id) {
-                $studentName = $user->first_name . ' ' . $user->last_name;
-                Notification::create([
-                    'user_id'    => $req->tutor_id,
-                    'type'       => 'request_cancelled',
-                    'message'    => "{$studentName} cancelled their tutoring request for {$req->course?->course_code}.",
-                    'request_id' => $req->request_id,
-                    'is_read'    => false,
-                ]);
-            }
+            Notification::where('request_id', $req->request_id)->delete();
+            $req->delete();
 
             return response()->json(['message' => 'Request cancelled.']);
         }

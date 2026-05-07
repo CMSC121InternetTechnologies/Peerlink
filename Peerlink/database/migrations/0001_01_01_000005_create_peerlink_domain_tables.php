@@ -188,10 +188,12 @@ return new class extends Migration
             $table->decimal('rating_avg', 3, 2)->default(0);
         });
 
+        // SQLite always starts fresh — use course_id directly (the 2026_05_06
+        // migration converts topic_id→course_id on existing MySQL DBs only).
         Schema::create('Tutor_Expertise', function (Blueprint $table) {
             $table->uuid('user_id');
-            $table->unsignedInteger('topic_id');
-            $table->primary(['user_id', 'topic_id']);
+            $table->unsignedInteger('course_id');
+            $table->primary(['user_id', 'course_id']);
         });
 
         Schema::create('Rooms', function (Blueprint $table) {

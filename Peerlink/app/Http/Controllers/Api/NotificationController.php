@@ -13,11 +13,12 @@ class NotificationController extends Controller
         $user = $request->user();
 
         $notifications = Notification::where('user_id', $user->user_id)
+            ->where('is_read', false)
             ->orderByDesc('created_at')
             ->limit(30)
             ->get();
 
-        $unreadCount = $notifications->where('is_read', false)->count();
+        $unreadCount = $notifications->count();
 
         return response()->json([
             'unread_count'  => $unreadCount,
