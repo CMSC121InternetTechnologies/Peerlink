@@ -8,8 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ asset('style.css') }}"/>
-  <!--<link rel = "stlesheet" hred = "{{ asset('\resources\css\dashboard.css') }}"/>-->
-  @vite(['resources/css/style.css', 'resources/css/register.css', 'resources/js/app.js', 'resources/css/dashboard.css'])
+  @vite(['resources/css/style.css', 'resources/js/app.js', 'resources/css/dashboard.css'])
 </head>
 <body class="mode-tutee">
 
