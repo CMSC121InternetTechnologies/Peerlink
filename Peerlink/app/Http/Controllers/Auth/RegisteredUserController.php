@@ -23,18 +23,20 @@ class RegisteredUserController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'middle_name' => ['nullable', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'contact_number' => ['required', 'string', 'regex:/^\+63[\s\-]?9\d{2}[\s\-]?\d{3}[\s\-]?\d{4}$/'],
-            'program_code' => ['required', 'string', 'exists:Programs,program_code'],
-            'current_year_level' => ['required', 'integer', 'min:1', 'max:100'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255','min: 3', 'ends_with:@up.edu.ph', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
-            'email.ends_with' => ['Please use a valid UP webmail address (@up.edu.ph or @edu.ph) to register.'],
-        ]);
         
+                $request->validate([
+                'first_name' => ['required', 'string', 'max:100'],
+                'middle_name' => ['nullable', 'string', 'max:100'],
+                'last_name' => ['required', 'string', 'max:100'],
+                'contact_number' => ['required', 'string', 'regex:/^(09|\+639)\d{9}$/'], 
+                'program_code' => ['required', 'string', 'exists:Programs,program_code'],
+                'current_year_level' => ['required', 'integer', 'min:1', 'max:10'],
+                'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'min:3', 'ends_with:@up.edu.ph', 'unique:'.User::class],
+                'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            ], [
+                'email.ends_with' => 'Please use a valid UP webmail address (@up.edu.ph) to register.',
+                'contact_number.regex' => 'The contact number must be in the format 09xxxxxxxxx or +639xxxxxxxxx.' 
+            ]);
         $cleaned_contact = str_replace([' ', '-'], '', $request->contact_number);
         $user = User::create([
             'first_name' => $request->first_name,
