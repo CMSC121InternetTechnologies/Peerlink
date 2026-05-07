@@ -73,23 +73,23 @@ class ProfileApiController extends Controller
             'tuteeCourses.*' => ['string', 'exists:Courses,course_code'],
         ]);
 
+        $tutorProfile = TutorProfile::where('user_id', $user->user_id)->first();
+
         $hasTutorContent = !empty($validated['bio'])
             || (!empty($validated['tutorCourses']) && count($validated['tutorCourses']) > 0);
-
-        $tutorProfile = TutorProfile::find($user->user_id);
 
         if ($hasTutorContent) {
             if (!$tutorProfile) {
                 $tutorProfile = TutorProfile::create([
                     'user_id'    => $user->user_id,
-                    'bio'        => '',
+                    'bio'        => $validated['bio'] ?? '',
                     'rating_avg' => 0,
                 ]);
+            } else {
+                $tutorProfile->bio = $validated['bio'] ?? '';
+                $tutorProfile->save();
             }
-            $tutorProfile->bio = $validated['bio'] ?? '';
-            $tutorProfile->save();
         } elseif ($tutorProfile && array_key_exists('bio', $validated)) {
-            // Allow clearing bio on existing profile without creating a new one
             $tutorProfile->bio = '';
             $tutorProfile->save();
         }

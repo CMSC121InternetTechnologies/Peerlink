@@ -339,6 +339,7 @@ body {
     width: 100%;
 }
 
+
 .toast {
     position: fixed;
     bottom: 1.5rem;
@@ -356,6 +357,8 @@ body {
 .toast.show {
     opacity: 1;
 }
+
+
 
 /* ===== MODE TOGGLE ===== */
 .mode-toggle {
@@ -405,4 +408,5 @@ body.mode-tutee {
 
 body.mode-tutor {
     background: #e8f4f7;
+
 }
