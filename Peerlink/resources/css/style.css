@@ -359,12 +359,7 @@ body {
 }
 
 
-.modal {
-  max-height: 90vh; 
-  overflow-y: auto; 
-  
-  /*webkit-overflow-scrolling: touch; uncomment when ready to deplay and you have optimizes CSS to mobile devices. tnx hehe*/
-}
+
 /* ===== MODE TOGGLE ===== */
 .mode-toggle {
     display: flex;
@@ -413,4 +408,5 @@ body.mode-tutee {
 
 body.mode-tutor {
     background: #e8f4f7;
+
 }
