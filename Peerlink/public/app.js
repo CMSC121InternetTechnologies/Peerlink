@@ -56,20 +56,15 @@ async function apiPatch(url, body) {
   }
   const res = await fetch(url, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.error || err.message || `Error ${res.status}`;
-    if (res.status === 419) showToast('Session expired — please refresh the page (F5).');
+    if (res.status === 419 || res.status === 401) showToast('Session expired — please refresh the page (F5).');
     else showToast(msg);
     console.error('PATCH', url, res.status, err);
-    return null;
-  }
-  const ct = res.headers.get('Content-Type') || '';
-  if (!ct.includes('application/json')) {
-    showToast('Session expired — please refresh the page (F5).');
     return null;
   }
   return res.json().catch(() => null);
@@ -83,13 +78,13 @@ async function apiPost(url, body) {
   }
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.error || err.message || `Error ${res.status}`;
-    if (res.status === 419) showToast('Session expired — please refresh the page (F5).');
+    if (res.status === 419 || res.status === 401) showToast('Session expired — please refresh the page (F5).');
     else showToast(msg);
     console.error('POST', url, res.status, err);
     return null;
@@ -554,12 +549,15 @@ function switchReqTab(tab) {
 
 async function fetchTutorRequests() {
   try {
-    const res = await fetch('/api/requests?role=tutor');
-    if (!res.ok) throw new Error();
+    const res = await fetch('/api/requests?role=tutor', {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     pendingRequests = data.requests || [];
   } catch {
-    pendingRequests = [];
+    // keep existing data so buttons in open modal remain functional
   }
   renderTutorRequests();
 }
@@ -698,6 +696,8 @@ async function submitCounterProposal() {
   pendingRequests = pendingRequests.filter(r => r.id !== requestId);
   renderTutorRequests();
   showToast('Counter-proposal sent to student.');
+  fetchMyRequests();
+  fetchNotifications();
   if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
 }
 
@@ -761,16 +761,16 @@ async function submitGroupSession() {
 async function fetchMyRequests() {
   const list = document.getElementById('myRequestsList');
   if (list) list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">Loading…</p>';
+  const jsonHeaders = { 'Accept': 'application/json' };
   try {
     const [sRes, tRes] = await Promise.all([
-      fetch('/api/requests?role=student', { cache: 'no-store' }),
-      fetch('/api/requests?role=tutor',   { cache: 'no-store' }),
+      fetch('/api/requests?role=student', { cache: 'no-store', headers: jsonHeaders }),
+      fetch('/api/requests?role=tutor',   { cache: 'no-store', headers: jsonHeaders }),
     ]);
-    myRequestsData     = sRes.ok ? ((await sRes.json()).requests || []) : [];
-    myIncomingRequests = tRes.ok ? ((await tRes.json()).requests || []) : [];
+    if (sRes.ok) myRequestsData     = (await sRes.json()).requests || [];
+    if (tRes.ok) myIncomingRequests = (await tRes.json()).requests || [];
+    if (!sRes.ok || !tRes.ok) throw new Error(`HTTP ${!sRes.ok ? sRes.status : tRes.status}`);
   } catch (err) {
-    myRequestsData = [];
-    myIncomingRequests = [];
     console.error('fetchMyRequests failed:', err);
     if (list) list.innerHTML = `<p style="text-align:center;color:var(--coral);padding:2rem 0;">Failed to load requests (${err.message}). Try refreshing.</p>`;
     return;
@@ -886,7 +886,12 @@ function toggleNotifDropdown() {
       if (lastFetchedNotifs.length > 0) {
         lastFetchedNotifs.forEach(n => dismissedNotifIds.add(n.id));
         document.getElementById('notifBadge').style.display = 'none';
-        apiPatch('/api/notifications/read', {});
+        const token = getCsrfToken();
+        if (token) fetch('/api/notifications/read', {
+          method: 'PATCH', keepalive: true,
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+          body: '{}',
+        });
       }
     });
   }
@@ -1359,26 +1364,6 @@ async function joinSession(id) {
   fetchSessions();
 }
 
-// ===== PHASE 2.3: CANCEL REQUEST =====
-async function cancelRequest(id) {
-  showConfirmModal(
-    'Cancel Request',
-    'Cancel this request? It will be marked as Cancelled in your history.',
-    async () => {
-      const res = await apiPatch(`/api/requests/${id}`, { action: 'cancel' });
-      if (!res) return;
-      showToast('Request cancelled.');
-      const req = myRequestsData.find(r => r.id === id);
-      if (req) req.status = 'Cancelled';
-      // Force filter to 'all' so the cancelled entry is immediately visible
-      const filterEl = document.getElementById('myRequestsFilter');
-      if (filterEl) { filterEl.value = 'all'; localStorage.setItem('pl_reqFilter', 'all'); }
-      renderMyRequests();
-      fetchNotifications();
-    },
-    { icon: '🗑️', confirmLabel: 'Yes, Cancel', cancelLabel: 'Keep it', destructive: true }
-  );
-}
 
 async function declineIncomingRequest(id) {
   showConfirmModal(
@@ -1393,6 +1378,21 @@ async function declineIncomingRequest(id) {
       fetchNotifications();
     },
     { icon: '✖️', confirmLabel: 'Decline', cancelLabel: 'Go Back', destructive: true }
+  );
+}
+
+async function cancelRequest(id) {
+  showConfirmModal(
+    'Cancel Request',
+    'Cancel this request? It will be marked as Cancelled in your history.',
+    async () => {
+      const res = await apiPatch(`/api/requests/${id}`, { action: 'cancel' });
+      if (!res) return;
+      showToast('Request cancelled.');
+      fetchMyRequests();
+      fetchNotifications();
+    },
+    { confirmLabel: 'Yes, Cancel', cancelLabel: 'Keep it', destructive: true }
   );
 }
 
@@ -1502,8 +1502,7 @@ function renderMyRequests() {
           </div>`;
       }
 
-      const canCancel = req.status === 'Pending' || req.status === 'CounterProposed';
-      const cancelBtn = canCancel
+      const cancelBtn = (req.status === 'Pending' || req.status === 'CounterProposed')
         ? `<div style="margin-top:.5rem;">
              <button class="btn-outline" style="font-size:.8rem;padding:.3rem .7rem;color:var(--coral);border-color:var(--coral);"
                onclick="cancelRequest('${esc(req.id)}')">Cancel Request</button>

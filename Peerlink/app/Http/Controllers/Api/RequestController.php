@@ -265,16 +265,11 @@ class RequestController extends Controller
             return response()->json(['message' => 'Counter-proposal accepted and session scheduled.']);
         }
 
-        // --- Student cancels their own pending/counter-proposed request ---
-        // Row is kept with status=Cancelled so the tutee sees the badge.
-        // Tutor's incoming list filters by Pending only, so it disappears for them.
         if ($action === 'cancel') {
-            if ($req->student_id !== $user->user_id) {
+            if ($req->student_id !== $user->user_id)
                 return response()->json(['error' => 'Unauthorized'], 403);
-            }
-            if (!in_array($req->status, ['Pending', 'CounterProposed'])) {
+            if (!in_array($req->status, ['Pending', 'CounterProposed']))
                 return response()->json(['error' => 'Only pending or counter-proposed requests can be cancelled.'], 422);
-            }
 
             $req->status = 'Cancelled';
             $req->save();
@@ -289,7 +284,6 @@ class RequestController extends Controller
                     'is_read'    => false,
                 ]);
             }
-
             return response()->json(['message' => 'Request cancelled.']);
         }
 
