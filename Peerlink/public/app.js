@@ -129,7 +129,16 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchProfile();   // loads bio, tutorCourses, stats, rooms
   fetchTutors();
   fetchNotifications();
-  setInterval(fetchNotifications, 30000);
+
+  let notifInterval = setInterval(fetchNotifications, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearInterval(notifInterval);
+    } else {
+      fetchNotifications();
+      notifInterval = setInterval(fetchNotifications, 60000);
+    }
+  });
 
   // Bio char counter
   const bioInput = document.getElementById('bioInput');

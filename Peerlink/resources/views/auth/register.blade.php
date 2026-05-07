@@ -43,7 +43,11 @@
             </select>
 
             <label>Current Year Level (e.g., 1, 2, 3)</label>
-            <input type="number" name="current_year_level" value="{{ old('current_year_level') }}" required min="1" max="100">
+            {{-- Bug: HTML max was 100 but the server-side rule is max:10, giving an
+                 unexpected validation error for values 11–100 with no client-side hint.
+                 Fix: align max with the server rule so the browser rejects out-of-range
+                 values before the form is even submitted. --}}
+            <input type="number" name="current_year_level" value="{{ old('current_year_level') }}" required min="1" max="10">
             
             <label>Contact Number (Format: +639xxxxxxxxx or 09xxxxxxxxx)</label>
             <input type="text" name="contact_number" value="{{ old('contact_number') }}" required placeholder="+63 912-345-6789" style="width: 100%; margin-bottom: 0.5rem;">

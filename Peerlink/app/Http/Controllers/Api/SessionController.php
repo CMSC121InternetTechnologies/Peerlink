@@ -27,8 +27,16 @@ class SessionController extends Controller
             ->orderByDesc('scheduled_time')
             ->get();
 
+        // Bug: formatSession() fired a SessionReview::exists() query per session (N+1).
+        // Fix: fetch all reviewed session IDs for this user in one query and pass the
+        // pre-built set into the formatter so it never hits the DB inside the loop.
+        $reviewedIds = SessionReview::whereIn('session_id', $sessions->pluck('session_id'))
+            ->where('reviewer_id', $user->user_id)
+            ->pluck('session_id')
+            ->flip(); // keyed collection for O(1) isset() lookup
+
         return response()->json([
-            'sessions' => $sessions->map(fn($s) => $this->formatSession($s, $user->user_id)),
+            'sessions' => $sessions->map(fn($s) => $this->formatSession($s, $user->user_id, $reviewedIds)),
         ]);
     }
 
@@ -105,25 +113,40 @@ class SessionController extends Controller
             return response()->json(['error' => 'You have already joined this session.'], 422);
         }
 
-        // Check capacity
-        $tuteeCount = DB::table('Session_Participants')
-            ->where('session_id', $id)
-            ->where('role', 'Tutee')
-            ->count();
-        $capacity = DB::table('Rooms')->where('room_id', $session->room_id)->value('capacity') ?? 99;
+        // Bug: capacity check and insert were separate queries with no lock; two
+        // concurrent requests could both pass the check and both insert, exceeding
+        // room capacity. Fix: wrap both inside a transaction with a FOR UPDATE lock
+        // so only one request can read-and-write at a time.
+        $joined = false;
+        DB::transaction(function () use ($id, $session, $user, &$joined) {
+            $capacity = DB::table('Rooms')
+                ->where('room_id', $session->room_id)
+                ->lockForUpdate()
+                ->value('capacity') ?? 99;
 
-        if ($tuteeCount >= $capacity) {
+            $tuteeCount = DB::table('Session_Participants')
+                ->where('session_id', $id)
+                ->where('role', 'Tutee')
+                ->count();
+
+            if ($tuteeCount >= $capacity) {
+                return; // $joined stays false
+            }
+
+            DB::table('Session_Participants')->insert([
+                'participation_id' => (string) Str::uuid(),
+                'session_id'       => $id,
+                'user_id'          => $user->user_id,
+                'role'             => 'Tutee',
+                'has_attended'     => null,
+                'joined_at'        => now(),
+            ]);
+            $joined = true;
+        });
+
+        if (!$joined) {
             return response()->json(['error' => 'This session is full.'], 422);
         }
-
-        DB::table('Session_Participants')->insert([
-            'participation_id' => (string) Str::uuid(),
-            'session_id'       => $id,
-            'user_id'          => $user->user_id,
-            'role'             => 'Tutee',
-            'has_attended'     => null,
-            'joined_at'        => now(),
-        ]);
 
         // Notify the tutor
         $tutorId = $session->request?->tutor_id;
@@ -240,7 +263,9 @@ class SessionController extends Controller
         return response()->json(['message' => 'Session cancelled.']);
     }
 
-    private function formatSession(TutoringSession $s, string $userId): array
+    // $reviewedIds is a collection keyed by session_id (built once by the caller)
+    // to avoid an extra DB query per session (N+1 fix).
+    private function formatSession(TutoringSession $s, string $userId, \Illuminate\Support\Collection $reviewedIds): array
     {
         $myRole = $s->participantUsers
             ->firstWhere('user_id', $userId)?->pivot->role ?? 'Tutee';
@@ -262,10 +287,9 @@ class SessionController extends Controller
                 : 'Unknown';
         }
 
-        $hasReview = SessionReview::where('session_id', $s->session_id)
-            ->where('reviewer_id', $userId)
-            ->exists();
-
+        // Bug: SessionReview::exists() was called here for every session (N+1).
+        // Fix: use the pre-fetched $reviewedIds collection passed from the caller.
+        $hasReview  = isset($reviewedIds[$s->session_id]);
         $tuteeCount = $s->participantUsers->where('pivot.role', 'Tutee')->count();
 
         return [

@@ -46,7 +46,12 @@ class TutorController extends Controller
 
         $courses = $tutor->courses->pluck('course_code')->filter()->unique()->values();
 
-        $reviews = $tutor->reviews()->with('reviewer')->orderByDesc('created_at')->limit(20)->get()
+        // Bug: the eager-loaded $tutor->reviews collection was ignored; a second query
+        // ($tutor->reviews()->with('reviewer')->...->get()) was fired for the same data.
+        // Fix: sort and slice the already-loaded collection; zero extra DB queries.
+        $reviews = $tutor->reviews
+            ->sortByDesc('created_at')
+            ->take(20)
             ->map(fn($r) => [
                 'rating'       => $r->rating,
                 'feedback'     => $r->feedback,
@@ -54,7 +59,8 @@ class TutorController extends Controller
                     ? ($r->reviewer->first_name . ' ' . $r->reviewer->last_name)
                     : 'Anonymous',
                 'createdAt'    => $r->created_at,
-            ]);
+            ])
+            ->values();
 
         return response()->json([
             'id'          => $tutor->user_id,

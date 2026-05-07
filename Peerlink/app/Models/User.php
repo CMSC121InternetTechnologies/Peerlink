@@ -34,9 +34,10 @@ class User extends Authenticatable
 
     protected function casts(): array
     {
-        return [
-            'password_hash' => 'hashed',
-        ];
+        // Bug: the 'hashed' cast re-hashes on every set, causing double-hashing
+        // when controllers already call Hash::make() before assigning.
+        // Fix: remove the cast; controllers handle hashing manually and consistently.
+        return [];
     }
 
     public function getAuthPassword(): string

@@ -36,7 +36,12 @@ class ProfileApiController extends Controller
         }
 
         $photo = DB::table('User_Photos')->where('user_id', $user->user_id)->first();
-        $photoUrl = $photo ? ('data:image/jpeg;base64,' . base64_encode($photo->image_data)) : null;
+        // Bug: MIME was hardcoded as image/jpeg; PNG/WebP uploads would render broken.
+        // Fix: use the mime_type stored during upload (falls back to image/jpeg for rows
+        // that existed before the mime_type column was added).
+        $photoUrl = $photo
+            ? ('data:' . ($photo->mime_type ?? 'image/jpeg') . ';base64,' . base64_encode($photo->image_data))
+            : null;
 
         return response()->json([
             'bio'              => $tutorProfile?->bio ?? '',
@@ -162,38 +167,48 @@ class ProfileApiController extends Controller
     {
         $user = $request->user();
 
+        // Bug: 'string' alone placed no cap on payload size (memory exhaustion)
+        // and any binary data could be stored, not just images.
+        // Fix: enforce a strict max length (≈ 2 MB base64 ≈ 2_800_000 chars)
+        // and detect the real MIME type server-side after decoding.
         $request->validate([
-            'photo' => ['required', 'string'], // base64 data URL
+            'photo' => ['required', 'string', 'max:2800000'],
         ]);
 
         $dataUrl = $request->input('photo');
-        // Strip the data URL prefix (data:image/jpeg;base64,...)
-        $base64 = preg_replace('/^data:image\/\w+;base64,/', '', $dataUrl);
-        $binary = base64_decode($base64);
 
-        if (!$binary) {
-            return response()->json(['error' => 'Invalid image data.'], 422);
+        // Extract the declared MIME type and the raw base64 payload.
+        if (!preg_match('/^data:(image\/\w+);base64,(.+)$/', $dataUrl, $matches)) {
+            return response()->json(['error' => 'Invalid image data URL format.'], 422);
+        }
+
+        $base64 = $matches[2];
+        $binary = base64_decode($base64, strict: true);
+
+        // Bug: base64_decode returns false OR an empty string for bad input;
+        // !$binary catches both. Using strict: true returns false on non-base64 chars.
+        if ($binary === false || $binary === '') {
+            return response()->json(['error' => 'Invalid base64 image data.'], 422);
+        }
+
+        // Bug: MIME type was hardcoded as image/jpeg on read-back regardless of
+        // what was uploaded. Fix: detect the real MIME from the decoded binary and
+        // store it alongside the data so it can be served correctly.
+        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($binary);
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!in_array($detectedMime, $allowedMimes, true)) {
+            return response()->json(['error' => 'Only JPEG, PNG, GIF, and WebP images are allowed.'], 422);
         }
 
         DB::table('User_Photos')->updateOrInsert(
             ['user_id' => $user->user_id],
-            ['image_data' => $binary, 'uploaded_at' => now()]
+            ['image_data' => $binary, 'mime_type' => $detectedMime, 'uploaded_at' => now()]
         );
 
         return response()->json(['message' => 'Photo uploaded.']);
     }
 
-    // GET /api/profile — also return photo and personal info
-    public function showPhoto(Request $request)
-    {
-        $user  = $request->user();
-        $photo = DB::table('User_Photos')->where('user_id', $user->user_id)->first();
-
-        if (!$photo) {
-            return response()->json(['photo' => null]);
-        }
-
-        $base64 = base64_encode($photo->image_data);
-        return response()->json(['photo' => 'data:image/jpeg;base64,' . $base64]);
-    }
+    // Bug: showPhoto() was defined but had no route registered in web.php or api.php,
+    // making it permanently unreachable (dead code). The photo URL is already returned
+    // by show(), so this duplicate method is removed entirely.
 }

@@ -21,6 +21,10 @@ class ProfileUpdateRequest extends FormRequest
                 'lowercase',
                 'email',
                 'max:255',
+                // Bug: registration enforced @up.edu.ph but this form did not,
+                // allowing users to switch to a non-institutional address.
+                // Fix: mirror the same domain constraint used at registration.
+                'ends_with:@up.edu.ph',
                 Rule::unique(User::class)->ignore($this->user()->user_id, 'user_id'),
             ],
         ];

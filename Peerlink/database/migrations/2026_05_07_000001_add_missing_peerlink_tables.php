@@ -100,13 +100,18 @@ return new class extends Migration
         if (!Schema::hasTable('User_Photos')) {
             DB::statement("
                 CREATE TABLE `User_Photos` (
-                    `user_id`     char(36)   NOT NULL,
-                    `image_data`  longblob   NOT NULL,
-                    `uploaded_at` timestamp  NULL DEFAULT current_timestamp(),
+                    `user_id`     char(36)      NOT NULL,
+                    `image_data`  longblob      NOT NULL,
+                    `mime_type`   varchar(50)   NOT NULL DEFAULT 'image/jpeg',
+                    `uploaded_at` timestamp     NULL DEFAULT current_timestamp(),
                     PRIMARY KEY (`user_id`),
                     CONSTRAINT `UP_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
             ");
+        } elseif (!Schema::hasColumn('User_Photos', 'mime_type')) {
+            // Bug: mime_type column was absent; MIME was hardcoded as image/jpeg on
+            // read-back. Add the column for existing tables so real MIME can be stored.
+            DB::statement("ALTER TABLE `User_Photos` ADD COLUMN `mime_type` varchar(50) NOT NULL DEFAULT 'image/jpeg' AFTER `image_data`");
         }
 
         // ── 6. Notifications ──────────────────────────────────────────────────
@@ -171,6 +176,8 @@ return new class extends Migration
         Schema::create('User_Photos', function (Blueprint $table) {
             $table->uuid('user_id')->primary();
             $table->binary('image_data');
+            // Added mime_type so the correct MIME is served instead of hardcoded image/jpeg.
+            $table->string('mime_type', 50)->default('image/jpeg');
             $table->timestamp('uploaded_at')->nullable()->useCurrent();
         });
 
@@ -204,6 +211,11 @@ return new class extends Migration
                     DB::statement("ALTER TABLE `Requests` DROP COLUMN `{$col}`");
                 }
             }
+            // Bug: shrinking the enum without first clearing CounterProposed rows causes
+            // MySQL to silently convert them to an empty string (data corruption).
+            // Fix: demote CounterProposed rows to Pending before removing the value,
+            // mirroring the pattern used in migration 000002 for the Cancelled status.
+            DB::table('Requests')->where('status', 'CounterProposed')->update(['status' => 'Pending']);
             DB::statement("ALTER TABLE `Requests` MODIFY COLUMN `status` enum('Pending','Approved','Declined','Expired') DEFAULT 'Pending'");
         }
     }

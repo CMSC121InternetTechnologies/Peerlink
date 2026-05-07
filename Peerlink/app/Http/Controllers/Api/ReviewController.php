@@ -22,6 +22,19 @@ class ReviewController extends Controller
             'feedback'    => ['nullable', 'string', 'max:1000'],
         ]);
 
+        // Bug #4: no check prevented a user from submitting a review for themselves.
+        // Fix: reject the request when reviewer_id === reviewee_id.
+        if ($user->user_id === $validated['reviewee_id']) {
+            return response()->json(['error' => 'You cannot review yourself.'], 422);
+        }
+
+        // Bug #5: reviews could be submitted on Scheduled or Cancelled sessions.
+        // Fix: load the session and confirm it is Completed before proceeding.
+        $session = \App\Models\TutoringSession::where('session_id', $validated['session_id'])->firstOrFail();
+        if ($session->status !== 'Completed') {
+            return response()->json(['error' => 'Reviews can only be submitted for completed sessions.'], 422);
+        }
+
         // Prevent duplicate reviews
         if (SessionReview::where('session_id', $validated['session_id'])
                 ->where('reviewer_id', $user->user_id)
@@ -37,6 +50,17 @@ class ReviewController extends Controller
 
         if (!$participated) {
             return response()->json(['error' => 'You did not participate in this session.'], 403);
+        }
+
+        // Bug #6: only the reviewer's participation was verified; any user_id could be
+        // passed as reviewee_id. Fix: also confirm the reviewee was in the same session.
+        $revieweeParticipated = DB::table('Session_Participants')
+            ->where('session_id', $validated['session_id'])
+            ->where('user_id', $validated['reviewee_id'])
+            ->exists();
+
+        if (!$revieweeParticipated) {
+            return response()->json(['error' => 'The reviewee did not participate in this session.'], 403);
         }
 
         SessionReview::create([
