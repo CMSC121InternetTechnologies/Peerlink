@@ -239,7 +239,7 @@ class RequestController extends Controller
             return response()->json(['message' => 'Counter-proposal accepted and session scheduled.']);
         }
 
-        // --- Student cancels their own pending request ---
+        // --- Student cancels their own pending/counter-proposed request ---
         if ($action === 'cancel') {
             if ($req->student_id !== $user->user_id) {
                 return response()->json(['error' => 'Unauthorized'], 403);
@@ -248,19 +248,8 @@ class RequestController extends Controller
                 return response()->json(['error' => 'Only pending or counter-proposed requests can be cancelled.'], 422);
             }
 
-            $req->status = 'Expired';
-            $req->save();
-
-            if ($req->tutor_id && $req->tutor_id !== $user->user_id) {
-                $studentName = $user->first_name . ' ' . $user->last_name;
-                Notification::create([
-                    'user_id'    => $req->tutor_id,
-                    'type'       => 'request_cancelled',
-                    'message'    => "{$studentName} cancelled their tutoring request for {$req->course?->course_code}.",
-                    'request_id' => $req->request_id,
-                    'is_read'    => false,
-                ]);
-            }
+            Notification::where('request_id', $req->request_id)->delete();
+            $req->delete();
 
             return response()->json(['message' => 'Request cancelled.']);
         }

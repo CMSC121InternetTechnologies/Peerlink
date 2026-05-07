@@ -9,6 +9,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // SQLite (tests) starts with course_id already set in 000005 — nothing to do.
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
+        // MySQL: if the column is already course_id (e.g. DB bootstrapped from
+        // database.sql which has course_id from the start), skip the ALTER.
+        if (Schema::hasColumn('Tutor_Expertise', 'course_id')) {
+            return;
+        }
+
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
         DB::table('Tutor_Expertise')->truncate();
 
@@ -34,6 +45,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
         DB::table('Tutor_Expertise')->truncate();
         DB::statement('ALTER TABLE Tutor_Expertise DROP FOREIGN KEY Tutor_Expertise_course_fk');

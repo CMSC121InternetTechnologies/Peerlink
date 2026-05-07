@@ -25,16 +25,27 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
+            'contact_number' => ['required', 'string', 'regex:/^\+63[\s\-]?9\d{2}[\s\-]?\d{3}[\s\-]?\d{4}$/'],
             'program_code' => ['required', 'string', 'exists:Programs,program_code'],
-            'current_year_level' => ['required', 'integer', 'min:1'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class, 'regex:/@up\.edu\.ph$/i'],
+            'current_year_level' => ['required', 'integer', 'min:1', 'max:100'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class,
+                function ($attribute, $value, $fail) {
+                    if (!str_ends_with($value, '@up.edu.ph') && !str_ends_with($value, '@edu.ph')) {
+                        $fail('Only UP email addresses (@up.edu.ph or @edu.ph) are allowed.');
+                    }
+                },
+            ],
             'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
-
+        
+        $cleaned_contact = str_replace([' ', '-'], '', $request->contact_number);
         $user = User::create([
             'first_name' => $request->first_name,
+            'middle_name' => $request->middle_name,
             'last_name' => $request->last_name,
+            'contact_number' => $cleaned_contact,
             'program_code' => $request->program_code,
             'current_year_level' => $request->current_year_level,
             'email' => $request->email,

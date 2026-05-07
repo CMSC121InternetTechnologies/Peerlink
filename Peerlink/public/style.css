@@ -708,6 +708,85 @@ body.mode-tutee #tuteeBtn {
     min-height: 80px;
 }
 
+/* ===== CONFIRMATION MODAL ===== */
+.confirm-modal {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 2.5rem 2rem 2rem;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+  animation: slideUp 0.22s cubic-bezier(.16,1,.3,1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(18px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.confirm-modal-icon {
+  font-size: 2.75rem;
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.confirm-modal-title {
+  font-family: var(--font-head);
+  font-size: 1.25rem;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.confirm-modal-message {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  margin-bottom: 2rem;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.confirm-modal-actions .btn-outline,
+.confirm-btn-cancel {
+  flex: 1;
+  border: 2px solid #d0c8be;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.confirm-btn-cancel:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.confirm-btn-ok {
+  flex: 1;
+  border: none;
+  color: white;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.confirm-btn-ok:hover  { opacity: 0.88; }
+.confirm-btn-ok:active { transform: scale(.97); }
+
 .toast {
   position: fixed;
   bottom: 1.5rem;
@@ -728,6 +807,24 @@ body.mode-tutee #tuteeBtn {
 .toast.show {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
+}
+
+.btn-logout {
+  background: transparent;
+  color: var(--coral);
+  border: 1.5px solid var(--coral);
+  padding: 0.45rem 1.25rem;
+  border-radius: 50px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-logout:hover {
+  background: var(--coral);
+  color: white;
 }
 
 /* ===== SESSION REQUESTS MODAL (TUTOR) ===== */

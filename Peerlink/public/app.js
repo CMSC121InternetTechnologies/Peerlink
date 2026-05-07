@@ -1,3 +1,38 @@
+// ===== CONFIRM MODAL =====
+let _confirmCallback = null;
+
+function showConfirmModal(title, message, onConfirm, opts = {}) {
+  const {
+    icon         = '⚠️',
+    confirmLabel = 'Confirm',
+    cancelLabel  = 'Cancel',
+    destructive  = true,
+  } = opts;
+
+  document.getElementById('confirmIcon').textContent        = icon;
+  document.getElementById('confirmTitle').textContent       = title;
+  document.getElementById('confirmMessage').textContent     = message;
+  document.getElementById('confirmCancelBtn').textContent   = cancelLabel;
+
+  const okBtn = document.getElementById('confirmOkBtn');
+  okBtn.textContent       = confirmLabel;
+  okBtn.style.background  = destructive ? 'var(--coral)' : 'var(--teal)';
+
+  _confirmCallback = onConfirm;
+  document.getElementById('confirmModalOverlay').classList.add('open');
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirmModalOverlay').classList.remove('open');
+  _confirmCallback = null;
+}
+
+function _executeConfirm() {
+  const cb = _confirmCallback;
+  closeConfirmModal();
+  if (cb) cb();
+}
+
 // ===== UTILITIES =====
 function esc(str) {
   if (str == null) return '';
@@ -132,20 +167,20 @@ async function fetchProfile() {
     if (!res.ok) return;
     const data = await res.json();
 
+    console.log("PROFILE DATA FROM DATABASE:", data);
+
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
+    userProfile.tuteeCourses = data.tuteeCourses || []; 
     availableRooms           = data.rooms || [];
 
     updateProfileDisplay();
     populateGroupRoomSelect();
 
-    // Tutor dashboard stats
     document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
     document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
     document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
-  } catch {
-    // silently fail; stats stay as '—'
-  }
+  } catch {}
 }
 
 function toggleEditMode(isEdit) {
@@ -189,26 +224,32 @@ async function saveProfile(event) {
     const res = await fetch('/api/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ bio: userProfile.bio, tutorCourses: userProfile.tutorCourses }),
+      body: JSON.stringify({ 
+          bio: userProfile.bio, 
+          tutorCourses: userProfile.tutorCourses,
+          tuteeCourses: userProfile.tuteeCourses
+      }),
     });
     if (!res.ok) throw new Error();
+
     showToast('Profile saved!');
-    fetchProfile(); // refresh stats
+    fetchProfile();
   } catch {
     showToast('Failed to save profile.');
     return;
   }
 
-  updateProfileDisplay();
   toggleEditMode(false);
 }
 
 function updateProfileDisplay() {
   document.getElementById('bioDisplay').textContent = userProfile.bio || 'No bio added yet.';
-  document.getElementById('tutorCoursesDisplay').innerHTML =
-    userProfile.tutorCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
-  document.getElementById('tuteeCoursesDisplay').innerHTML =
-    userProfile.tuteeCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('');
+
+  const tutorDisplay = document.getElementById('tutorCoursesDisplay');
+  if (tutorDisplay) tutorDisplay.innerHTML = userProfile.tutorCourses.length > 0 ? userProfile.tutorCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join(''): '<p style="color: var(--text-muted); font-size: 0.9rem;">No courses added yet.</p>';
+
+  const tuteeDisplay = document.getElementById('tuteeCoursesDisplay');
+  if (tuteeDisplay) tuteeDisplay.innerHTML = userProfile.tuteeCourses.length > 0 ? userProfile.tuteeCourses.map(c => `<span class="course-badge">${esc(c)}</span>`).join('') : '<p style="color: var(--text-muted); font-size: 0.9rem;">No courses added yet.</p>';
 }
 
 // ===== DELETE ACCOUNT =====
@@ -250,10 +291,9 @@ function handleCourseInput(e) {
 
 function renderCourseSuggestions(query) {
   const container = document.getElementById('courseSuggestions');
-  let list = Array.from(allUniqueCourses);
-  if (query) list = list.filter(c => c.includes(query));
-  container.innerHTML = list.slice(0, 8)
-    .map(c => `<button onclick="addFilterCourse('${esc(c)}')">${esc(c)}</button>`).join('');
+  let list = window.__courses ? window.__courses.map(c => c.code) : [];
+  if (query) list = list.filter(c => c.includes(query)); 
+  container.innerHTML = list.slice(0, 6).map(c => `<button onclick="addFilterCourse('${esc(c)}')">${esc(c)}</button>`).join('');
 }
 
 function addFilterCourse(code) {
@@ -336,14 +376,15 @@ function openSessionModal(id) {
 
   document.getElementById('modalName').textContent = tutor.name;
   document.getElementById('modalSub').textContent  = tutor.degree || '';
+  
   document.getElementById('modalAvatar').textContent = tutor.initials || tutor.name[0];
 
   const sel = document.getElementById('sessionCourse');
   sel.innerHTML = '<option value="" disabled selected>Select a course</option>' +
     (tutor.courses || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
-  document.getElementById('sessionTopic').value   = '';
-  document.getElementById('sessionDate').value    = '';
+  document.getElementById('sessionTopic').innerHTML = '<option value="" disabled selected>Select a course first</option>';
+  document.getElementById('sessionDate').value = '';
   document.getElementById('sessionMessage').value = '';
   document.getElementById('sessionModalOverlay').classList.add('open');
 }
@@ -351,6 +392,20 @@ function openSessionModal(id) {
 function closeSessionModal() {
   document.getElementById('sessionModalOverlay').classList.remove('open');
   selectedTutor = null;
+}
+
+function updateSessionTopics() {
+    const courseCode = document.getElementById('sessionCourse').value;
+    const topicSelect = document.getElementById('sessionTopic');
+
+    const courseObj = window.__courses.find(c => c.code === courseCode);
+
+    if (courseObj && courseObj.topics && courseObj.topics.length > 0) {
+      topicSelect.innerHTML = '<option value="" disabled selected>Select a topic</option>' +
+      courseObj.topics.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    } else {
+      topicSelect.innerHTML = '<option value="General Tutoring">General Tutoring</option>';
+    }
 }
 
 async function submitRequest() {
@@ -450,23 +505,37 @@ function renderTutorRequests() {
 }
 
 async function respondTutorRequest(id, action) {
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showToast(err.error || 'Action failed.');
-      return;
+  const doRequest = async () => {
+    try {
+      const res = await fetch(`/api/requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || 'Action failed.');
+        return;
+      }
+      pendingRequests = pendingRequests.filter(r => r.id !== id);
+      renderTutorRequests();
+      showToast(action === 'accept' ? 'Session accepted!' : 'Request declined.');
+      fetchNotifications();
+      if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
+    } catch {
+      showToast('Action failed. Please try again.');
     }
-    pendingRequests = pendingRequests.filter(r => r.id !== id);
-    renderTutorRequests();
-    showToast(action === 'accept' ? 'Session accepted!' : 'Request declined.');
-    if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
-  } catch {
-    showToast('Action failed. Please try again.');
+  };
+
+  if (action === 'decline') {
+    showConfirmModal(
+      'Decline Request',
+      'Decline this tutoring request? The student will be notified.',
+      doRequest,
+      { icon: '✖️', confirmLabel: 'Decline', cancelLabel: 'Go Back', destructive: true }
+    );
+  } else {
+    doRequest();
   }
 }
 
@@ -522,7 +591,7 @@ async function claimBroadcast(id) {
     broadcastRequests = broadcastRequests.filter(r => r.id !== id);
     renderBroadcastRequests();
     showToast('Broadcast claimed and session scheduled!');
-    fetchProfile(); // update upcoming sessions count
+    fetchProfile();
   } catch {
     showToast('Action failed. Please try again.');
   }
@@ -670,6 +739,7 @@ function renderMyRequests() {
     Declined:        'var(--coral)',
     Expired:         '#aaa',
     CounterProposed: 'var(--purple)',
+    Cancelled:       '#888',
   };
 
   list.innerHTML = shown.map(req => {
@@ -729,21 +799,35 @@ function renderMyRequests() {
 }
 
 async function respondToCounter(requestId, action) {
-  try {
-    const res = await fetch(`/api/requests/${requestId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showToast(err.error || 'Action failed.');
-      return;
+  const doRequest = async () => {
+    try {
+      const res = await fetch(`/api/requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || 'Action failed.');
+        return;
+      }
+      showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
+      fetchMyRequests();
+      fetchNotifications();
+    } catch {
+      showToast('Action failed. Please try again.');
     }
-    showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
-    fetchMyRequests();
-  } catch {
-    showToast('Action failed. Please try again.');
+  };
+
+  if (action === 'student_decline') {
+    showConfirmModal(
+      'Decline Proposal',
+      'Decline the tutor\'s proposed schedule? This request will be marked as declined.',
+      doRequest,
+      { icon: '✖️', confirmLabel: 'Decline Proposal', cancelLabel: 'Go Back', destructive: true }
+    );
+  } else {
+    doRequest();
   }
 }
 
@@ -814,12 +898,14 @@ function renderNotifications(notifications, unreadCount) {
     list.innerHTML = `<p class="notif-empty">No notifications yet.</p>`;
     return;
   }
+  const SESSION_TYPES = new Set(['session_completed', 'session_cancelled']);
   list.innerHTML = notifications.map(n => {
     const time = n.created_at
       ? new Date(n.created_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
       : '';
+    const targetView = SESSION_TYPES.has(n.type) ? 'sessions' : 'requests';
     return `
-      <div class="notif-item${n.is_read ? '' : ' notif-unread'}">
+      <div class="notif-item${n.is_read ? '' : ' notif-unread'}" style="cursor:pointer" onclick="notifNavigate('${esc(targetView)}')">
         <div class="notif-msg">${esc(n.message)}</div>
         <div class="notif-time">${time}</div>
       </div>`;
@@ -833,14 +919,22 @@ function toggleNotifDropdown() {
 }
 
 async function markAllNotificationsRead() {
+  document.getElementById('notifBadge').style.display = 'none';
+  const list = document.getElementById('notifList');
+  if (list) list.innerHTML = '<p class="notif-empty">No new notifications.</p>';
   try {
     await fetch('/api/notifications/read', {
       method: 'PATCH',
       headers: { 'X-CSRF-TOKEN': getCsrfToken() },
     });
-    document.getElementById('notifBadge').style.display = 'none';
-    document.querySelectorAll('.notif-unread').forEach(el => el.classList.remove('notif-unread'));
+    fetchNotifications();
   } catch { /* ignore */ }
+}
+
+function notifNavigate(view) {
+  notifDropdownOpen = false;
+  document.getElementById('notifDropdown').classList.remove('open');
+  switchView(view);
 }
 
 // ===== US_06 + US_07: ONBOARDING =====
@@ -900,6 +994,12 @@ function renderObTags() {
 }
 
 async function obFinish() {
+  // Check if the user selected at least one course
+  if (obCourses.length === 0) {
+    showToast('Please add at least one course before finishing.');
+    return;
+  }
+
   const btn = document.getElementById('obFinishBtn');
   btn.disabled   = true;
   btn.textContent = 'Saving…';
@@ -1252,32 +1352,46 @@ function renderSessions() {
 }
 
 async function completeSession(id) {
-  if (!confirm('Mark this session as completed?')) return;
-  try {
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'complete' }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-    showToast('Session marked as completed!');
-    fetchSessions();
-    fetchProfile();
-  } catch { showToast('Action failed.'); }
+  showConfirmModal(
+    'Mark as Completed',
+    'Confirm this session is done? Students will be prompted to leave a review.',
+    async () => {
+      try {
+        const res = await fetch(`/api/sessions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'complete' }),
+        });
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+        showToast('Session marked as completed!');
+        fetchSessions();
+        fetchProfile();
+        fetchNotifications();
+      } catch { showToast('Action failed.'); }
+    },
+    { icon: '✅', confirmLabel: 'Mark Complete', cancelLabel: 'Not Yet', destructive: false }
+  );
 }
 
 async function cancelSession(id) {
-  if (!confirm('Cancel this session? All participants will be notified.')) return;
-  try {
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'cancel' }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-    showToast('Session cancelled.');
-    fetchSessions();
-  } catch { showToast('Action failed.'); }
+  showConfirmModal(
+    'Cancel Session',
+    'This session will be cancelled and all participants will be notified.',
+    async () => {
+      try {
+        const res = await fetch(`/api/sessions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'cancel' }),
+        });
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+        showToast('Session cancelled.');
+        fetchSessions();
+        fetchNotifications();
+      } catch { showToast('Action failed.'); }
+    },
+    { icon: '🚫', confirmLabel: 'Yes, Cancel Session', cancelLabel: 'Keep it', destructive: true }
+  );
 }
 
 // ===== PHASE 2.2: BROWSE OPEN GROUP SESSIONS =====
@@ -1340,31 +1454,45 @@ async function joinSession(id) {
 
 // ===== PHASE 2.3: CANCEL REQUEST =====
 async function cancelRequest(id) {
-  if (!confirm('Cancel this request?')) return;
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'cancel' }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-    showToast('Request cancelled.');
-    fetchMyRequests();
-  } catch { showToast('Failed to cancel request.'); }
+  showConfirmModal(
+    'Cancel Request',
+    'Cancel this request? This cannot be undone.',
+    async () => {
+      try {
+        const res = await fetch(`/api/requests/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'cancel' }),
+        });
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
+        showToast('Request cancelled.');
+        fetchMyRequests();
+        fetchNotifications();
+      } catch { showToast('Failed to cancel request.'); }
+    },
+    { icon: '🗑️', confirmLabel: 'Yes, Cancel', cancelLabel: 'Keep it', destructive: true }
+  );
 }
 
 async function declineIncomingRequest(id) {
-  if (!confirm('Decline this request?')) return;
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'decline' }),
-    });
-    if (!res.ok) { const e = await res.json(); showToast(e.error || 'Failed.'); return; }
-    showToast('Request declined.');
-    fetchMyRequests();
-  } catch { showToast('Failed to decline request.'); }
+  showConfirmModal(
+    'Decline Request',
+    'Are you sure you want to decline this tutoring request? The student will be notified.',
+    async () => {
+      try {
+        const res = await fetch(`/api/requests/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+          body: JSON.stringify({ action: 'decline' }),
+        });
+        if (!res.ok) { const e = await res.json(); showToast(e.error || 'Failed.'); return; }
+        showToast('Request declined.');
+        fetchMyRequests();
+        fetchNotifications();
+      } catch { showToast('Failed to decline request.'); }
+    },
+    { icon: '✖️', confirmLabel: 'Decline', cancelLabel: 'Go Back', destructive: true }
+  );
 }
 
 function openAcceptFromMyRequests(id) {
@@ -1425,6 +1553,7 @@ renderMyRequests = function() {
     Declined:        'var(--coral)',
     Expired:         '#aaa',
     CounterProposed: 'var(--purple)',
+    Cancelled:       '#888',
   };
 
   list.innerHTML = `

@@ -15,7 +15,8 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        $isMySQL = DB::getDriverName() === 'mysql';
+        if ($isMySQL) DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
         $pw = Hash::make('password');
 
@@ -285,7 +286,7 @@ class DatabaseSeeder extends Seeder
         // Notifications are generated naturally by the application when users interact
         // (send requests, accept, decline, counter-propose, etc.) — not seeded here.
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        if ($isMySQL) DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         $this->command->info('PeerLink seed data inserted successfully.');
         $this->command->line('');

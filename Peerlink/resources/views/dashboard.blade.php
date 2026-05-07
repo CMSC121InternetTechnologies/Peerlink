@@ -37,11 +37,6 @@
       <a href="#" class="nav-link" id="navMyRequests"  onclick="switchView('myRequests')">My Requests</a>
       <a href="#" class="nav-link" id="navMySessions"  onclick="switchView('mySessions')">My Sessions</a>
       <a href="#" class="nav-link" id="navProfile"     onclick="switchView('profile')">Profile</a>
-      <form method="POST" action="{{ route('logout') }}" style="display:inline;">
-        @csrf
-        <a href="{{ route('logout') }}" class="nav-link"
-           onclick="event.preventDefault(); this.closest('form').submit();">Log out</a>
-      </form>
     </div>
 
     <!-- Notification Bell -->
@@ -84,6 +79,12 @@
         Tutee
       </button>
     </div>
+
+    <!-- Logout Button -->
+    <form method="POST" action="{{ route('logout') }}" style="display: flex; align-items: center;">
+      @csrf
+      <button type="submit" class="btn-logout" title="Log out safely">Log out</button>
+    </form>
   </nav>
 
   <main class="page">
@@ -176,6 +177,7 @@
             <option value="CounterProposed">Counter-Proposed</option>
             <option value="Approved">Approved</option>
             <option value="Declined">Declined</option>
+            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
       </div>
@@ -348,10 +350,8 @@
         </form>
       </div>
     </div>
-
   </main>
 
-  <!-- ===== SESSION REQUEST MODAL (US_09) ===== -->
   <div class="modal-overlay" id="sessionModalOverlay" onclick="closeSessionModal()">
     <div class="modal" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeSessionModal()">✕</button>
@@ -636,6 +636,19 @@
       <button class="modal-close" onclick="closeTutorProfile()">✕</button>
       <div id="tutorProfileContent">
         <div style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRMATION MODAL ===== -->
+  <div class="modal-overlay" id="confirmModalOverlay" onclick="closeConfirmModal()">
+    <div class="confirm-modal" onclick="event.stopPropagation()">
+      <div class="confirm-modal-icon" id="confirmIcon"></div>
+      <h2 class="confirm-modal-title" id="confirmTitle"></h2>
+      <p class="confirm-modal-message" id="confirmMessage"></p>
+      <div class="confirm-modal-actions">
+        <button class="btn-outline confirm-btn-cancel" id="confirmCancelBtn" onclick="closeConfirmModal()">Cancel</button>
+        <button class="confirm-btn-ok" id="confirmOkBtn" onclick="_executeConfirm()">Confirm</button>
       </div>
     </div>
   </div>
