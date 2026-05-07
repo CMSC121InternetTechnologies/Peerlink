@@ -6,6 +6,7 @@ use App\Models\SessionReview;
 use App\Models\TutorProfile;
 use App\Models\TutoringSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReviewController extends Controller
 {
@@ -28,10 +29,13 @@ class ReviewController extends Controller
             return response()->json(['error' => 'You have already reviewed this session.'], 422);
         }
 
-        // Verify the reviewer participated in this session (via request)
-        $session = TutoringSession::findOrFail($validated['session_id']);
-        $req = $session->request;
-        if (!$req || ($req->student_id !== $user->user_id && $req->tutor_id !== $user->user_id)) {
+        // Verify the reviewer participated in this session
+        $participated = DB::table('Session_Participants')
+            ->where('session_id', $validated['session_id'])
+            ->where('user_id', $user->user_id)
+            ->exists();
+
+        if (!$participated) {
             return response()->json(['error' => 'You did not participate in this session.'], 403);
         }
 
