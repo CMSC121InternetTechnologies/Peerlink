@@ -126,6 +126,22 @@ class RequestController extends Controller
         ]);
 
         $course  = Course::where('course_code', $validated['course_code'])->firstOrFail();
+
+        // Prevent duplicate active requests
+        $duplicate = TutoringRequest::where('student_id', $user->user_id)
+            ->where('course_id', $course->course_id)
+            ->whereIn('status', ['Pending', 'CounterProposed'])
+            ->when(
+                $validated['tutor_id'] ?? null,
+                fn($q, $tid) => $q->where('tutor_id', $tid),
+                fn($q)        => $q->whereNull('tutor_id')
+            )
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json(['error' => 'You already have a pending request for this course.'], 422);
+        }
+
         $message = $validated['message'] ?? '';
         if (!empty($validated['preferred_date'])) {
             $message = '[Preferred: ' . $validated['preferred_date'] . '] ' . $message;
