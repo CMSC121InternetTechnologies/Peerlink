@@ -13,15 +13,15 @@
 
   <!-- Pass server data to JS -->
   <script>
-    window.__onboarding = {{ $onboarding ? 'true' : 'false' }};
+    window.__onboarding = {{ ($onboarding ?? false) ? 'true' : 'false' }};
     window.__courses  = {!! json_encode($courses->map(fn($c) => ['code' => $c->course_code, 'name' => $c->course_name])->values()) !!};
     window.__programs = {!! json_encode($programs->map(fn($p) => ['code' => $p->program_code])->values()) !!};
     window.__authUser = {
-      firstName:  '{{ addslashes(auth()->user()->first_name) }}',
-      lastName:   '{{ addslashes(auth()->user()->last_name) }}',
-      programCode:'{{ auth()->user()->program_code }}',
-      yearLevel:  {{ auth()->user()->current_year_level ?? 'null' }},
-      contact:    '{{ addslashes(auth()->user()->contact_number ?? '') }}',
+      firstName:   @json(auth()->user()->first_name),
+      lastName:    @json(auth()->user()->last_name),
+      programCode: @json(auth()->user()->program_code),
+      yearLevel:   @json(auth()->user()->current_year_level),
+      contact:     @json(auth()->user()->contact_number ?? ''),
     };
   </script>
 
@@ -52,7 +52,7 @@
       <div class="notif-dropdown" id="notifDropdown">
         <div class="notif-dropdown-header">
           <span>Notifications</span>
-          <button class="notif-mark-read" onclick="markAllNotificationsRead()">Mark all read</button>
+          <button class="notif-mark-read" onclick="markAllNotificationsRead(true)">Mark all read</button>
         </div>
         <div id="notifList"><p class="notif-empty">No notifications yet.</p></div>
       </div>
@@ -171,7 +171,7 @@
       <div class="page-header">
         <h1 class="page-title">My Requests</h1>
         <div class="filter-row">
-          <select id="myRequestsFilter" onchange="renderMyRequests()" class="select-course" style="width:auto;min-width:160px;">
+          <select id="myRequestsFilter" onchange="localStorage.setItem('pl_reqFilter',this.value);renderMyRequests()" class="select-course" style="width:auto;min-width:160px;">
             <option value="all">All</option>
             <option value="Pending">Pending</option>
             <option value="CounterProposed">Counter-Proposed</option>
@@ -189,7 +189,7 @@
       <div class="page-header">
         <h1 class="page-title">My Sessions</h1>
         <div class="filter-row">
-          <select id="sessionsFilter" onchange="renderSessions()" class="select-course" style="width:auto;min-width:160px;">
+          <select id="sessionsFilter" onchange="localStorage.setItem('pl_sessFilter',this.value);renderSessions()" class="select-course" style="width:auto;min-width:160px;">
             <option value="all">All</option>
             <option value="Scheduled">Upcoming</option>
             <option value="Completed">Completed</option>

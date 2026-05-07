@@ -48,6 +48,55 @@ function getCsrfToken() {
   return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
 
+async function apiPatch(url, body) {
+  const token = getCsrfToken();
+  if (!token) {
+    showToast('Session error — please refresh the page (F5).');
+    return null;
+  }
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err.error || err.message || `Error ${res.status}`;
+    if (res.status === 419) showToast('Session expired — please refresh the page (F5).');
+    else showToast(msg);
+    console.error('PATCH', url, res.status, err);
+    return null;
+  }
+  const ct = res.headers.get('Content-Type') || '';
+  if (!ct.includes('application/json')) {
+    showToast('Session expired — please refresh the page (F5).');
+    return null;
+  }
+  return res.json().catch(() => null);
+}
+
+async function apiPost(url, body) {
+  const token = getCsrfToken();
+  if (!token) {
+    showToast('Session error — please refresh the page (F5).');
+    return null;
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err.error || err.message || `Error ${res.status}`;
+    if (res.status === 419) showToast('Session expired — please refresh the page (F5).');
+    else showToast(msg);
+    console.error('POST', url, res.status, err);
+    return null;
+  }
+  return res;
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
@@ -65,6 +114,8 @@ let allUniqueCourses = new Set();
 let selectedTutor = null;
 let dropdownOpen = false;
 let notifDropdownOpen = false;
+let dismissedNotifIds = new Set(); // IDs marked as read this session — filtered out even if poll returns them
+let lastFetchedNotifs = [];        // most recent poll result, used to populate dismissedNotifIds
 let myRequestsData = [];
 let myIncomingRequests = [];
 let broadcastRequests = [];
@@ -75,8 +126,10 @@ let currentReqTab = 'direct';
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
-  setMode('tutee');
-  switchView('dashboard');
+  const savedMode = localStorage.getItem('pl_mode') || 'tutee';
+  const savedView = localStorage.getItem('pl_view') || 'dashboard';
+  setMode(savedMode);
+  switchView(savedView);
 
   fetchProfile();   // loads bio, tutorCourses, stats, rooms
   fetchTutors();
@@ -128,26 +181,48 @@ document.addEventListener('DOMContentLoaded', () => {
 // ===== NAVIGATION =====
 function switchView(view) {
   currentView = view;
-  ['dashboard', 'myRequests', 'profile'].forEach(v => {
-    const el = document.getElementById(v + 'View') || document.getElementById(v.charAt(0).toUpperCase() + v.slice(1) + 'View');
-    const key = { dashboard: 'dashboardView', myRequests: 'myRequestsView', profile: 'profileView' }[v];
-    if (key) document.getElementById(key).style.display = (v === view) ? 'block' : 'none';
+  localStorage.setItem('pl_view', view);
+
+  const viewMap = {
+    dashboard:  'dashboardView',
+    myRequests: 'myRequestsView',
+    mySessions: 'mySessionsView',
+    profile:    'profileView',
+  };
+  Object.entries(viewMap).forEach(([v, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (v === view) ? 'block' : 'none';
   });
 
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  const navMap = { dashboard: 'navDashboard', myRequests: 'navMyRequests', profile: 'navProfile' };
-  if (navMap[view]) document.getElementById(navMap[view]).classList.add('active');
+  const navMap = {
+    dashboard:  'navDashboard',
+    myRequests: 'navMyRequests',
+    mySessions: 'navMySessions',
+    profile:    'navProfile',
+  };
+  if (navMap[view]) document.getElementById(navMap[view])?.classList.add('active');
 
   if (view === 'myRequests') {
     const f = document.getElementById('myRequestsFilter');
-    if (f) f.value = 'all';
+    if (f) f.value = localStorage.getItem('pl_reqFilter') || 'all';
     fetchMyRequests();
+  }
+  if (view === 'mySessions') {
+    const f = document.getElementById('sessionsFilter');
+    if (f) f.value = localStorage.getItem('pl_sessFilter') || 'all';
+    fetchSessions();
+    fetchOpenSessions();
+  }
+  if (view === 'profile') {
+    loadPersonalInfo();
   }
 }
 
 // ===== MODE TOGGLE =====
 function setMode(mode) {
   currentMode = mode;
+  localStorage.setItem('pl_mode', mode);
   document.body.className = `mode-${mode}`;
   const badge = document.getElementById('roleBadge');
   if (mode === 'tutor') {
@@ -163,23 +238,28 @@ function setMode(mode) {
 // ===== PROFILE =====
 async function fetchProfile() {
   try {
-    const res = await fetch('/api/profile');
+    const res = await fetch('/api/profile', { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
 
-    console.log("PROFILE DATA FROM DATABASE:", data);
-
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
-    userProfile.tuteeCourses = data.tuteeCourses || []; 
+    userProfile.tuteeCourses = data.tuteeCourses || [];
     availableRooms           = data.rooms || [];
 
     updateProfileDisplay();
     populateGroupRoomSelect();
+    populateAcceptRoomSelect();
 
     document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
     document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
     document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
+
+    if (data.photoUrl) displayAvatar(data.photoUrl);
+    if (data.programCode) { const el = document.getElementById('displayProgram'); if (el) el.textContent = data.programCode; }
+    if (data.yearLevel)   { const el = document.getElementById('displayYearLevel'); if (el) el.textContent = data.yearLevel; }
+    const contactEl = document.getElementById('displayContact');
+    if (contactEl) contactEl.textContent = data.contactNumber || '—';
   } catch {}
 }
 
@@ -346,8 +426,9 @@ function filterTutors() {
 function renderTutors(tutors) {
   const grid  = document.getElementById('tutorsGrid');
   const empty = document.getElementById('emptyState');
-  if (!tutors.length) { grid.innerHTML = ''; empty.style.display = 'flex'; return; }
-  empty.style.display = 'none';
+  if (!tutors.length) { if (grid) grid.innerHTML = ''; if (empty) empty.style.display = 'flex'; return; }
+  if (empty) empty.style.display = 'none';
+  if (!grid) return;
   grid.innerHTML = tutors.map((t, i) => `
     <div class="tutor-card" style="animation-delay:${i * 0.06}s">
       <div class="tutor-card-header">
@@ -362,8 +443,12 @@ function renderTutors(tutors) {
       <div class="tutor-courses">
         ${(t.courses || []).map(c => `<span class="course-badge">${esc(c)}</span>`).join('')}
       </div>
-      <button class="btn-primary full-width" style="background:var(--purple);"
-              onclick="openSessionModal('${esc(t.id)}')">Request session</button>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+        <button class="btn-outline" style="flex:1;font-size:.82rem;padding:.5rem;"
+                onclick="openTutorProfile('${esc(t.id)}')">View Profile</button>
+        <button class="btn-primary"  style="flex:2;background:var(--purple);"
+                onclick="openSessionModal('${esc(t.id)}')">Request session</button>
+      </div>
     </div>
   `).join('');
 }
@@ -392,13 +477,17 @@ function openSessionModal(id) {
 function closeSessionModal() {
   document.getElementById('sessionModalOverlay').classList.remove('open');
   selectedTutor = null;
+  const wrap = document.getElementById('sessionTopicsWrap');
+  if (wrap) wrap.style.display = 'none';
+  const list = document.getElementById('sessionTopicsList');
+  if (list) list.innerHTML = '';
 }
 
 function updateSessionTopics() {
     const courseCode = document.getElementById('sessionCourse').value;
     const topicSelect = document.getElementById('sessionTopic');
 
-    const courseObj = window.__courses.find(c => c.code === courseCode);
+    const courseObj = window.__courses?.find(c => c.code === courseCode);
 
     if (courseObj && courseObj.topics && courseObj.topics.length > 0) {
       topicSelect.innerHTML = '<option value="" disabled selected>Select a topic</option>' +
@@ -410,37 +499,34 @@ function updateSessionTopics() {
 
 async function submitRequest() {
   const courseCode = document.getElementById('sessionCourse').value;
-  const topic      = document.getElementById('sessionTopic').value.trim();
   const date       = document.getElementById('sessionDate').value;
   const message    = document.getElementById('sessionMessage').value.trim();
+
+  // Collect checked topics from the topic picker
+  const checkedTopics = Array.from(
+    document.querySelectorAll('#sessionTopicsList input[type=checkbox]:checked')
+  ).map(cb => cb.value);
+  let topicField = document.getElementById('sessionTopic').value.trim();
+  if (checkedTopics.length) {
+    topicField = checkedTopics.join(', ') + (topicField ? '; ' + topicField : '');
+  }
 
   if (!courseCode || !date) { showToast('Please select a course and preferred schedule.'); return; }
 
   const tutorName = selectedTutor?.name || 'tutor';
   const tutorId   = selectedTutor?.id || null;
 
-  try {
-    const res = await fetch('/api/requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({
-        course_code:    courseCode,
-        tutor_id:       tutorId,
-        message:        (topic ? topic + (message ? '\n' + message : '') : message) || null,
-        preferred_date: date,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      showToast(err.message || 'Failed to send request.');
-      return;
-    }
-    closeSessionModal();
-    showToast(`Request sent to ${tutorName}!`);
-    fetchMyRequests();
-  } catch {
-    showToast('Failed to send request. Please try again.');
-  }
+  const res = await apiPost('/api/requests', {
+    course_code:    courseCode,
+    tutor_id:       tutorId,
+    message:        (topicField ? topicField + (message ? '\n' + message : '') : message) || null,
+    preferred_date: date,
+  });
+  if (!res) return;
+  closeSessionModal();
+  showToast(`Request sent to ${tutorName}!`);
+  fetchMyRequests();
+  fetchNotifications();
 }
 
 // ===== TUTOR: REQUESTS MODAL =====
@@ -505,26 +591,20 @@ function renderTutorRequests() {
 }
 
 async function respondTutorRequest(id, action) {
+  // For accept, open the scheduling modal instead of sending directly
+  if (action === 'accept') {
+    const req = pendingRequests.find(r => r.id === id) || myIncomingRequests.find(r => r.id === id);
+    if (req) { openAcceptModal(req); return; }
+  }
+
   const doRequest = async () => {
-    try {
-      const res = await fetch(`/api/requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || 'Action failed.');
-        return;
-      }
-      pendingRequests = pendingRequests.filter(r => r.id !== id);
-      renderTutorRequests();
-      showToast(action === 'accept' ? 'Session accepted!' : 'Request declined.');
-      fetchNotifications();
-      if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
-    } catch {
-      showToast('Action failed. Please try again.');
-    }
+    const res = await apiPatch(`/api/requests/${id}`, { action });
+    if (!res) return;
+    pendingRequests = pendingRequests.filter(r => r.id !== id);
+    renderTutorRequests();
+    showToast('Request declined.');
+    fetchNotifications();
+    if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
   };
 
   if (action === 'decline') {
@@ -576,25 +656,18 @@ function renderBroadcastRequests() {
   }).join('');
 }
 
-async function claimBroadcast(id) {
-  try {
-    const res = await fetch(`/api/requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'claim' }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showToast(err.error || 'Could not claim request.');
-      return;
-    }
-    broadcastRequests = broadcastRequests.filter(r => r.id !== id);
-    renderBroadcastRequests();
-    showToast('Broadcast claimed and session scheduled!');
-    fetchProfile();
-  } catch {
-    showToast('Action failed. Please try again.');
-  }
+// C2 fix: open accept modal so tutor specifies time/modality before claiming (US_14)
+function claimBroadcast(id) {
+  const req = broadcastRequests.find(r => r.id === id);
+  if (!req) return;
+  // Synthesise a shape compatible with openAcceptModal
+  openAcceptModal({
+    id:        req.id,
+    tuteeName: req.studentName || 'Student',
+    course:    req.course,
+    message:   req.message || '',
+    _isClaim:  true,  // flag so submitAccept uses 'claim' action
+  });
 }
 
 // ===== US_11: COUNTER-PROPOSAL MODAL =====
@@ -612,27 +685,20 @@ function closeCounterModal() {
 
 async function submitCounterProposal() {
   const requestId = document.getElementById('counterRequestId').value;
-  const time      = document.getElementById('counterTime').value;
+  const rawTime   = document.getElementById('counterTime').value;
+  const time      = rawTime ? rawTime.replace('T', ' ') + ':00' : '';
   const message   = document.getElementById('counterMessage').value.trim();
   const modality  = document.getElementById('counterModality').value;
 
   if (!time) { showToast('Please select a proposed date and time.'); return; }
 
-  try {
-    const res = await fetch(`/api/requests/${requestId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ action: 'counter_propose', counter_time: time, counter_message: message, counter_modality: modality }),
-    });
-    if (!res.ok) throw new Error();
-    closeCounterModal();
-    pendingRequests = pendingRequests.filter(r => r.id !== requestId);
-    renderTutorRequests();
-    showToast('Counter-proposal sent to student.');
-    if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
-  } catch {
-    showToast('Failed to send counter-proposal.');
-  }
+  const res = await apiPatch(`/api/requests/${requestId}`, { action: 'counter_propose', counter_time: time, counter_message: message, counter_modality: modality });
+  if (!res) return;
+  closeCounterModal();
+  pendingRequests = pendingRequests.filter(r => r.id !== requestId);
+  renderTutorRequests();
+  showToast('Counter-proposal sent to student.');
+  if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
 }
 
 // ===== US_13: GROUP SESSION MODAL =====
@@ -675,26 +741,20 @@ async function submitGroupSession() {
   if (!courseCode || !time) { showToast('Please fill in course and date/time.'); return; }
   if (modality === 'Online' && !link) { showToast('Please provide a meeting link for online sessions.'); return; }
 
-  try {
-    const res = await fetch('/api/sessions/broadcast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({
-        course_code:    courseCode,
-        scheduled_time: time,
-        modality,
-        room_id:        roomId ? parseInt(roomId) : null,
-        meeting_link:   link || null,
-        message,
-      }),
-    });
-    if (!res.ok) throw new Error();
-    closeGroupSessionModal();
-    showToast('Group session posted!');
-    fetchProfile();
-  } catch {
-    showToast('Failed to post group session.');
-  }
+  const res = await apiPost('/api/sessions/broadcast', {
+    course_code:    courseCode,
+    scheduled_time: time,
+    modality,
+    room_id:        roomId ? parseInt(roomId) : null,
+    meeting_link:   link || null,
+    message,
+  });
+  if (!res) return;
+  closeGroupSessionModal();
+  showToast('Group session posted!');
+  fetchProfile();
+  fetchSessions();
+  fetchNotifications();
 }
 
 // ===== MY REQUESTS VIEW (US_10 + US_11 student + US_16) =====
@@ -703,8 +763,8 @@ async function fetchMyRequests() {
   if (list) list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">Loading…</p>';
   try {
     const [sRes, tRes] = await Promise.all([
-      fetch('/api/requests?role=student'),
-      fetch('/api/requests?role=tutor'),
+      fetch('/api/requests?role=student', { cache: 'no-store' }),
+      fetch('/api/requests?role=tutor',   { cache: 'no-store' }),
     ]);
     myRequestsData     = sRes.ok ? ((await sRes.json()).requests || []) : [];
     myIncomingRequests = tRes.ok ? ((await tRes.json()).requests || []) : [];
@@ -723,100 +783,14 @@ async function fetchMyRequests() {
   }
 }
 
-function renderMyRequests() {
-  const filter = document.getElementById('myRequestsFilter').value;
-  const list   = document.getElementById('myRequestsList');
-  const shown  = filter === 'all' ? myRequestsData : myRequestsData.filter(r => r.status === filter);
-
-  if (!shown.length) {
-    list.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">No requests found.</p>`;
-    return;
-  }
-
-  const statusColor = {
-    Pending:         'var(--teal)',
-    Approved:        '#4caf50',
-    Declined:        'var(--coral)',
-    Expired:         '#aaa',
-    CounterProposed: 'var(--purple)',
-    Cancelled:       '#888',
-  };
-
-  list.innerHTML = shown.map(req => {
-    const color     = statusColor[req.status] || '#aaa';
-    const createdAt = req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '';
-
-    let counterHtml = '';
-    if (req.status === 'CounterProposed' && req.counterProposal) {
-      const cp     = req.counterProposal;
-      const cpDate = cp.proposedTime
-        ? new Date(cp.proposedTime).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
-        : '—';
-      counterHtml = `
-        <div class="counter-proposal-box">
-          <strong>Tutor proposes:</strong>
-          <div>🗓 ${cpDate}${cp.modality ? ' &nbsp;|&nbsp; ' + esc(cp.modality) : ''}${cp.room ? ' @ ' + esc(cp.room) : ''}</div>
-          ${cp.message ? `<div style="font-style:italic;margin-top:.25rem;">"${esc(cp.message)}"</div>` : ''}
-          <div class="request-actions" style="margin-top:.75rem;">
-            <button class="btn-accept"  onclick="respondToCounter('${esc(req.id)}','student_accept')">Accept</button>
-            <button class="btn-decline" onclick="respondToCounter('${esc(req.id)}','student_decline')">Decline</button>
-          </div>
-        </div>`;
-    }
-
-    let sessionHtml = '';
-    if (req.session) {
-      const sDate = req.session.scheduledTime
-        ? new Date(req.session.scheduledTime).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
-        : '—';
-      sessionHtml = `
-        <div class="session-details-box">
-          <strong>Session:</strong> ${esc(req.session.modality || '')}
-          ${req.session.room ? '@ ' + esc(req.session.room) : ''} &nbsp;|&nbsp; 🗓 ${sDate}
-          ${!req.session.hasReview && req.tutorId
-            ? `<button class="btn-outline"
-                style="margin-left:.5rem;padding:.3rem .8rem;font-size:.8rem;"
-                onclick="openReviewModal('${esc(req.session.session_id)}','${esc(req.tutorId)}','${esc(req.tutorName)}')">
-                ★ Leave Review
-              </button>`
-            : ''}
-          ${req.session.hasReview ? `<span style="color:#aaa;margin-left:.5rem;font-size:.85rem;">Reviewed ✓</span>` : ''}
-        </div>`;
-    }
-
-    return `
-      <div class="request-card">
-        <div class="request-header">
-          <div class="request-tutee">${esc(req.course || '—')} &mdash; ${esc(req.tutorName || 'Broadcast')}</div>
-          <span class="course-badge" style="margin:0;background:${color};color:white;">${esc(req.status)}</span>
-        </div>
-        ${req.message ? `<div class="request-msg" style="margin-top:.5rem;">"${esc(req.message)}"</div>` : ''}
-        <div class="request-date" style="margin-top:.25rem;">Sent: ${createdAt}</div>
-        ${counterHtml}
-        ${sessionHtml}
-      </div>`;
-  }).join('');
-}
-
 async function respondToCounter(requestId, action) {
   const doRequest = async () => {
-    try {
-      const res = await fetch(`/api/requests/${requestId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || 'Action failed.');
-        return;
-      }
-      showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
-      fetchMyRequests();
-      fetchNotifications();
-    } catch {
-      showToast('Action failed. Please try again.');
-    }
+    const res = await apiPatch(`/api/requests/${requestId}`, { action });
+    if (!res) return;
+    showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
+    fetchMyRequests();
+    fetchNotifications();
+    if (action === 'student_accept') fetchSessions();
   };
 
   if (action === 'student_decline') {
@@ -854,58 +828,49 @@ async function submitReview() {
 
   if (!rating) { showToast('Please select a star rating.'); return; }
 
-  try {
-    const res = await fetch('/api/reviews', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ session_id: sessionId, reviewee_id: tutorId, rating, feedback }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      showToast(err.error || 'Failed to submit review.');
-      return;
-    }
-    closeReviewModal();
-    showToast('Review submitted!');
-    fetchMyRequests();
-    fetchTutors(); // refresh ratings in explore
-  } catch {
-    showToast('Failed to submit review.');
-  }
+  const res = await apiPost('/api/reviews', { session_id: sessionId, reviewee_id: tutorId, rating, feedback });
+  if (!res) return;
+  closeReviewModal();
+  showToast('Review submitted!');
+  fetchMyRequests();
+  fetchTutors();
 }
 
 // ===== US_15: NOTIFICATIONS =====
 async function fetchNotifications() {
   try {
-    const res = await fetch('/api/notifications');
+    const res = await fetch('/api/notifications', { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
-    renderNotifications(data.notifications || [], data.unread_count || 0);
+    lastFetchedNotifs = data.notifications || [];
+    renderNotifications(lastFetchedNotifs, data.unread_count || 0);
   } catch { /* silently ignore poll failures */ }
 }
 
 function renderNotifications(notifications, unreadCount) {
+  const visible = notifications.filter(n => !dismissedNotifIds.has(n.id));
+
   const badge = document.getElementById('notifBadge');
-  if (unreadCount > 0) {
-    badge.textContent   = unreadCount > 9 ? '9+' : unreadCount;
+  if (visible.length > 0) {
+    badge.textContent   = visible.length > 9 ? '9+' : visible.length;
     badge.style.display = 'flex';
   } else {
     badge.style.display = 'none';
   }
 
   const list = document.getElementById('notifList');
-  if (!notifications.length) {
-    list.innerHTML = `<p class="notif-empty">No notifications yet.</p>`;
+  if (!visible.length) {
+    list.innerHTML = `<p class="notif-empty">No new notifications.</p>`;
     return;
   }
-  const SESSION_TYPES = new Set(['session_completed', 'session_cancelled']);
-  list.innerHTML = notifications.map(n => {
+  const SESSION_TYPES = new Set(['session_completed', 'session_cancelled', 'student_joined']);
+  list.innerHTML = visible.map(n => {
     const time = n.created_at
       ? new Date(n.created_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
       : '';
-    const targetView = SESSION_TYPES.has(n.type) ? 'sessions' : 'requests';
+    const targetView = SESSION_TYPES.has(n.type) ? 'mySessions' : 'myRequests';
     return `
-      <div class="notif-item${n.is_read ? '' : ' notif-unread'}" style="cursor:pointer" onclick="notifNavigate('${esc(targetView)}')">
+      <div class="notif-item notif-unread" style="cursor:pointer" onclick="notifNavigate('${esc(targetView)}')">
         <div class="notif-msg">${esc(n.message)}</div>
         <div class="notif-time">${time}</div>
       </div>`;
@@ -915,20 +880,25 @@ function renderNotifications(notifications, unreadCount) {
 function toggleNotifDropdown() {
   notifDropdownOpen = !notifDropdownOpen;
   document.getElementById('notifDropdown').classList.toggle('open', notifDropdownOpen);
-  if (notifDropdownOpen) markAllNotificationsRead();
+  if (notifDropdownOpen) {
+    // Fetch first so the user sees the notifications, then silently mark as read
+    fetchNotifications().then(() => {
+      if (lastFetchedNotifs.length > 0) {
+        lastFetchedNotifs.forEach(n => dismissedNotifIds.add(n.id));
+        document.getElementById('notifBadge').style.display = 'none';
+        apiPatch('/api/notifications/read', {});
+      }
+    });
+  }
 }
 
 async function markAllNotificationsRead() {
+  // Record every currently-fetched ID so renderNotifications filters them out on future polls
+  lastFetchedNotifs.forEach(n => dismissedNotifIds.add(n.id));
   document.getElementById('notifBadge').style.display = 'none';
   const list = document.getElementById('notifList');
   if (list) list.innerHTML = '<p class="notif-empty">No new notifications.</p>';
-  try {
-    await fetch('/api/notifications/read', {
-      method: 'PATCH',
-      headers: { 'X-CSRF-TOKEN': getCsrfToken() },
-    });
-    fetchNotifications();
-  } catch { /* ignore */ }
+  await apiPatch('/api/notifications/read', {});
 }
 
 function notifNavigate(view) {
@@ -1004,73 +974,22 @@ async function obFinish() {
   btn.disabled   = true;
   btn.textContent = 'Saving…';
 
-  // Save courses via real API (US_07)
-  if (obCourses.length > 0) {
-    try {
-      await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-        body: JSON.stringify({ tutorCourses: obCourses }),
-      });
-      userProfile.tutorCourses = [...obCourses];
-      updateProfileDisplay();
-      fetchProfile();
-    } catch { /* non-blocking */ }
-  }
+  // Save courses via real API (US_07) — obCourses is guaranteed non-empty from guard above
+  try {
+    await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      body: JSON.stringify({ tutorCourses: obCourses }),
+    });
+    userProfile.tutorCourses = [...obCourses];
+    updateProfileDisplay();
+    fetchProfile();
+  } catch { /* non-blocking */ }
 
   document.getElementById('onboardingOverlay').style.display = 'none';
   showToast('Welcome to PeerLink!');
 }
 
-// ===== UPDATED: switchView handles mySessions =====
-const _origSwitchView = switchView;
-switchView = function(view) {
-  currentView = view;
-  const views = { dashboardView: 'dashboard', myRequestsView: 'myRequests', mySessionsView: 'mySessions', profileView: 'profile' };
-  Object.keys(views).forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = (views[id] === view) ? 'block' : 'none';
-  });
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  const navMap = { dashboard: 'navDashboard', myRequests: 'navMyRequests', mySessions: 'navMySessions', profile: 'navProfile' };
-  if (navMap[view]) { const el = document.getElementById(navMap[view]); if (el) el.classList.add('active'); }
-
-  if (view === 'myRequests') {
-    const f = document.getElementById('myRequestsFilter');
-    if (f) f.value = 'all';
-    fetchMyRequests();
-  }
-  if (view === 'mySessions') { fetchSessions(); fetchOpenSessions(); }
-  if (view === 'profile')    loadPersonalInfo();
-};
-
-// ===== UPDATED: fetchProfile loads photo and personal info =====
-const _origFetchProfile = fetchProfile;
-fetchProfile = async function() {
-  try {
-    const res = await fetch('/api/profile');
-    if (!res.ok) return;
-    const data = await res.json();
-
-    userProfile.bio          = data.bio || '';
-    userProfile.tutorCourses = data.tutorCourses || [];
-    availableRooms           = data.rooms || [];
-
-    updateProfileDisplay();
-    populateGroupRoomSelect();
-    populateAcceptRoomSelect();
-
-    document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
-    document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
-    document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
-
-    if (data.photoUrl) displayAvatar(data.photoUrl);
-    if (data.programCode) document.getElementById('displayProgram').textContent = data.programCode;
-    if (data.yearLevel)   document.getElementById('displayYearLevel').textContent = data.yearLevel;
-    if (data.contactNumber) document.getElementById('displayContact').textContent = data.contactNumber;
-    else document.getElementById('displayContact').textContent = '—';
-  } catch { /* silently fail */ }
-};
 
 // ===== PROFILE PHOTO =====
 function displayAvatar(url) {
@@ -1145,7 +1064,7 @@ async function savePersonalInfo() {
       body: JSON.stringify({ program_code: programCode, current_year_level: yearLevel, contact_number: contactNumber || null }),
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       showToast(err.message || 'Update failed.');
       return;
     }
@@ -1186,7 +1105,7 @@ async function changePassword() {
       body: JSON.stringify({ current_password: current, password: newPw, password_confirmation: confirm }),
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       showToast(err.error || 'Failed to change password.');
       return;
     }
@@ -1196,6 +1115,8 @@ async function changePassword() {
 }
 
 // ===== PHASE 1.1: ACCEPT MODAL =====
+let _acceptIsClaim = false;  // true when opened from claimBroadcast
+
 function populateAcceptRoomSelect() {
   const sel = document.getElementById('acceptRoom');
   if (!sel) return;
@@ -1204,6 +1125,7 @@ function populateAcceptRoomSelect() {
 }
 
 function openAcceptModal(req) {
+  _acceptIsClaim = !!req._isClaim;
   document.getElementById('acceptRequestId').value  = req.id;
   document.getElementById('acceptStudentName').textContent = `Student: ${req.tuteeName}${req.course ? ' — ' + req.course : ''}`;
   document.getElementById('acceptModality').value   = 'In-Person';
@@ -1215,7 +1137,10 @@ function openAcceptModal(req) {
   let prefTime = '';
   if (req.message) {
     const m = req.message.match(/\[Preferred:\s*([^\]]+)\]/);
-    if (m) prefTime = m[1].trim();
+    if (m) {
+      // Normalize "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD HH:MM" → datetime-local "YYYY-MM-DDTHH:MM"
+      prefTime = m[1].trim().replace(' ', 'T').substring(0, 16);
+    }
   }
   document.getElementById('acceptTime').value = prefTime;
   populateAcceptRoomSelect();
@@ -1224,6 +1149,7 @@ function openAcceptModal(req) {
 
 function closeAcceptModal() {
   document.getElementById('acceptModalOverlay').classList.remove('open');
+  _acceptIsClaim = false;
 }
 
 function toggleAcceptLink() {
@@ -1234,53 +1160,47 @@ function toggleAcceptLink() {
 
 async function submitAccept() {
   const requestId    = document.getElementById('acceptRequestId').value;
-  const scheduledTime = document.getElementById('acceptTime').value;
+  const rawTime      = document.getElementById('acceptTime').value;
+  const scheduledTime = rawTime ? rawTime.replace('T', ' ') + ':00' : '';
   const modality     = document.getElementById('acceptModality').value;
   const roomId       = document.getElementById('acceptRoom').value || null;
   const meetingLink  = document.getElementById('acceptLink').value.trim() || null;
+  const isClaim      = _acceptIsClaim;
 
   if (!scheduledTime) { showToast('Please select a date and time.'); return; }
   if (modality === 'Online' && !meetingLink) { showToast('Please provide a meeting link for online sessions.'); return; }
 
-  try {
-    const res = await fetch(`/api/requests/${requestId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({
-        action:         'accept',
-        scheduled_time: scheduledTime,
-        modality,
-        room_id:        roomId ? parseInt(roomId) : null,
-        meeting_link:   meetingLink,
-      }),
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Accept failed.'); return; }
-    closeAcceptModal();
+  const res = await apiPatch(`/api/requests/${requestId}`, {
+    action:         isClaim ? 'claim' : 'accept',
+    scheduled_time: scheduledTime,
+    modality,
+    room_id:        roomId ? parseInt(roomId) : null,
+    meeting_link:   meetingLink,
+  });
+  if (!res) return;
+  closeAcceptModal();
+  if (isClaim) {
+    broadcastRequests = broadcastRequests.filter(r => r.id !== requestId);
+    renderBroadcastRequests();
+    showToast('Broadcast claimed and session scheduled!');
+  } else {
     pendingRequests = pendingRequests.filter(r => r.id !== requestId);
     renderTutorRequests();
     showToast('Session accepted and scheduled!');
-    fetchProfile();
-    fetchMyRequests();
     if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
-  } catch { showToast('Failed to accept request.'); }
+  }
+  fetchProfile();
+  fetchMyRequests();
+  fetchNotifications();
 }
 
-// Patch respondTutorRequest to open accept modal instead of sending directly
-const _origRespond = respondTutorRequest;
-respondTutorRequest = async function(id, action) {
-  if (action === 'accept') {
-    const req = pendingRequests.find(r => r.id === id);
-    if (req) { openAcceptModal(req); return; }
-  }
-  return _origRespond(id, action);
-};
 
 // ===== PHASE 2.1: MY SESSIONS =====
 let mySessions = [];
 
 async function fetchSessions() {
   try {
-    const res = await fetch('/api/sessions');
+    const res = await fetch('/api/sessions', { cache: 'no-store' });
     if (!res.ok) throw new Error();
     const data = await res.json();
     mySessions = data.sessions || [];
@@ -1356,18 +1276,14 @@ async function completeSession(id) {
     'Mark as Completed',
     'Confirm this session is done? Students will be prompted to leave a review.',
     async () => {
-      try {
-        const res = await fetch(`/api/sessions/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-          body: JSON.stringify({ action: 'complete' }),
-        });
-        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-        showToast('Session marked as completed!');
-        fetchSessions();
-        fetchProfile();
-        fetchNotifications();
-      } catch { showToast('Action failed.'); }
+      const res = await apiPatch(`/api/sessions/${id}`, { action: 'complete' });
+      if (!res) return;
+      showToast('Session marked as completed!');
+      const filterEl = document.getElementById('sessionsFilter');
+      if (filterEl) filterEl.value = 'all';
+      fetchSessions();
+      fetchProfile();
+      fetchNotifications();
     },
     { icon: '✅', confirmLabel: 'Mark Complete', cancelLabel: 'Not Yet', destructive: false }
   );
@@ -1378,17 +1294,13 @@ async function cancelSession(id) {
     'Cancel Session',
     'This session will be cancelled and all participants will be notified.',
     async () => {
-      try {
-        const res = await fetch(`/api/sessions/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-          body: JSON.stringify({ action: 'cancel' }),
-        });
-        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-        showToast('Session cancelled.');
-        fetchSessions();
-        fetchNotifications();
-      } catch { showToast('Action failed.'); }
+      const res = await apiPatch(`/api/sessions/${id}`, { action: 'cancel' });
+      if (!res) return;
+      showToast('Session cancelled.');
+      const filterElCancel = document.getElementById('sessionsFilter');
+      if (filterElCancel) filterElCancel.value = 'all';
+      fetchSessions();
+      fetchNotifications();
     },
     { icon: '🚫', confirmLabel: 'Yes, Cancel Session', cancelLabel: 'Keep it', destructive: true }
   );
@@ -1399,7 +1311,7 @@ let openSessions = [];
 
 async function fetchOpenSessions() {
   try {
-    const res = await fetch('/api/sessions/open');
+    const res = await fetch('/api/sessions/open', { cache: 'no-store' });
     if (!res.ok) throw new Error();
     const data = await res.json();
     openSessions = data.sessions || [];
@@ -1440,35 +1352,29 @@ function renderOpenSessions() {
 }
 
 async function joinSession(id) {
-  try {
-    const res = await fetch(`/api/sessions/${id}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-    });
-    if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed to join.'); return; }
-    showToast('You have joined the session!');
-    fetchOpenSessions();
-    fetchSessions();
-  } catch { showToast('Failed to join session.'); }
+  const res = await apiPost(`/api/sessions/${id}/join`, {});
+  if (!res) return;
+  showToast('You have joined the session!');
+  fetchOpenSessions();
+  fetchSessions();
 }
 
 // ===== PHASE 2.3: CANCEL REQUEST =====
 async function cancelRequest(id) {
   showConfirmModal(
     'Cancel Request',
-    'Cancel this request? This cannot be undone.',
+    'Cancel this request? It will be marked as Cancelled in your history.',
     async () => {
-      try {
-        const res = await fetch(`/api/requests/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-          body: JSON.stringify({ action: 'cancel' }),
-        });
-        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Failed.'); return; }
-        showToast('Request cancelled.');
-        fetchMyRequests();
-        fetchNotifications();
-      } catch { showToast('Failed to cancel request.'); }
+      const res = await apiPatch(`/api/requests/${id}`, { action: 'cancel' });
+      if (!res) return;
+      showToast('Request cancelled.');
+      const req = myRequestsData.find(r => r.id === id);
+      if (req) req.status = 'Cancelled';
+      // Force filter to 'all' so the cancelled entry is immediately visible
+      const filterEl = document.getElementById('myRequestsFilter');
+      if (filterEl) { filterEl.value = 'all'; localStorage.setItem('pl_reqFilter', 'all'); }
+      renderMyRequests();
+      fetchNotifications();
     },
     { icon: '🗑️', confirmLabel: 'Yes, Cancel', cancelLabel: 'Keep it', destructive: true }
   );
@@ -1479,17 +1385,12 @@ async function declineIncomingRequest(id) {
     'Decline Request',
     'Are you sure you want to decline this tutoring request? The student will be notified.',
     async () => {
-      try {
-        const res = await fetch(`/api/requests/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-          body: JSON.stringify({ action: 'decline' }),
-        });
-        if (!res.ok) { const e = await res.json(); showToast(e.error || 'Failed.'); return; }
-        showToast('Request declined.');
-        fetchMyRequests();
-        fetchNotifications();
-      } catch { showToast('Failed to decline request.'); }
+      const res = await apiPatch(`/api/requests/${id}`, { action: 'decline' });
+      if (!res) return;
+      myIncomingRequests = myIncomingRequests.filter(r => r.id !== id);
+      renderMyRequests();
+      showToast('Request declined.');
+      fetchNotifications();
     },
     { icon: '✖️', confirmLabel: 'Decline', cancelLabel: 'Go Back', destructive: true }
   );
@@ -1501,8 +1402,8 @@ function openAcceptFromMyRequests(id) {
   openAcceptModal(req);
 }
 
-// Override renderMyRequests — mode-aware: tutor toggle → incoming, tutee toggle → sent
-renderMyRequests = function() {
+// Mode-aware: tutor toggle → incoming requests, tutee toggle → sent requests
+function renderMyRequests() {
   const list      = document.getElementById('myRequestsList');
   const filterRow = document.querySelector('#myRequestsView .filter-row');
 
@@ -1529,6 +1430,7 @@ renderMyRequests = function() {
             <div class="request-date" style="margin-top:.25rem;">Received: ${dateStr}</div>
             <div class="request-actions" style="margin-top:.75rem;">
               <button class="btn-accept"  onclick="openAcceptFromMyRequests('${esc(req.id)}')">Accept</button>
+              <button class="btn-outline" onclick="openCounterModal('${esc(req.id)}')">Propose Changes</button>
               <button class="btn-decline" onclick="declineIncomingRequest('${esc(req.id)}')">Decline</button>
             </div>
           </div>`;
@@ -1704,89 +1606,27 @@ async function loadSessionTopics() {
   }
 }
 
-// Patch submitRequest to include selected topics (topics are optional)
-const _origSubmitRequest = submitRequest;
-submitRequest = async function() {
-  const courseCode = document.getElementById('sessionCourse').value;
-  const date       = document.getElementById('sessionDate').value;
-  const message    = document.getElementById('sessionMessage').value.trim();
 
-  const checkedTopics = Array.from(
-    document.querySelectorAll('#sessionTopicsList input[type=checkbox]:checked')
-  ).map(cb => cb.value);
-
-  let topicField = document.getElementById('sessionTopic').value.trim();
-  if (checkedTopics.length) {
-    topicField = checkedTopics.join(', ') + (topicField ? '; ' + topicField : '');
-    document.getElementById('sessionTopic').value = topicField;
+// ===== ESC KEY: close any open modal =====
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const modalMap = [
+    ['confirmModalOverlay',    closeConfirmModal],
+    ['sessionModalOverlay',    closeSessionModal],
+    ['requestsModalOverlay',   closeRequestsModal],
+    ['counterModalOverlay',    closeCounterModal],
+    ['groupSessionModalOverlay', closeGroupSessionModal],
+    ['reviewModalOverlay',     closeReviewModal],
+    ['acceptModalOverlay',     closeAcceptModal],
+    ['tutorProfileOverlay',    closeTutorProfile],
+    ['deleteModal',            closeDeleteModal],
+  ];
+  for (const [id, fn] of modalMap) {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('open')) { fn(); return; }
   }
-
-  if (!courseCode || !date) { showToast('Please select a course and preferred schedule.'); return; }
-
-  const tutorName = selectedTutor?.name || 'tutor';
-  const tutorId   = selectedTutor?.id || null;
-
-  try {
-    const res = await fetch('/api/requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({
-        course_code:    courseCode,
-        tutor_id:       tutorId,
-        message:        (topicField ? topicField + (message ? '\n' + message : '') : message) || null,
-        preferred_date: date,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      showToast(err.message || 'Failed to send request.');
-      return;
-    }
-    closeSessionModal();
-    showToast(`Request sent to ${tutorName}!`);
-    fetchMyRequests();
-  } catch {
-    showToast('Failed to send request. Please try again.');
+  if (notifDropdownOpen) {
+    notifDropdownOpen = false;
+    document.getElementById('notifDropdown').classList.remove('open');
   }
-};
-
-// Patch closeSessionModal to reset topics
-const _origCloseSessionModal = closeSessionModal;
-closeSessionModal = function() {
-  _origCloseSessionModal();
-  const wrap = document.getElementById('sessionTopicsWrap');
-  if (wrap) wrap.style.display = 'none';
-  const list = document.getElementById('sessionTopicsList');
-  if (list) list.innerHTML = '';
-};
-
-// ===== PATCH renderTutors to add "View Profile" button
-const _origRenderTutors = renderTutors;
-renderTutors = function(tutors) {
-  _origRenderTutors(tutors);
-  // Replace the grid content with updated cards that include a profile button
-  const grid = document.getElementById('tutorsGrid');
-  if (!grid || !tutors.length) return;
-  grid.innerHTML = tutors.map((t, i) => `
-    <div class="tutor-card" style="animation-delay:${i * 0.06}s">
-      <div class="tutor-card-header">
-        <div class="tutor-avatar">${esc(t.initials || t.name[0])}</div>
-        <div class="tutor-info">
-          <div class="tutor-name">${esc(t.name)}</div>
-          <div class="tutor-degree">${esc(t.degree || '')}</div>
-          <div class="tutor-rating"><span class="star">★</span> ${(t.rating || 0).toFixed(1)}
-            <span>(${t.reviews || 0} reviews)</span></div>
-        </div>
-      </div>
-      <div class="tutor-courses">
-        ${(t.courses || []).map(c => `<span class="course-badge">${esc(c)}</span>`).join('')}
-      </div>
-      <div style="display:flex;gap:.5rem;margin-top:.75rem;">
-        <button class="btn-outline" style="flex:1;font-size:.82rem;padding:.5rem;"
-                onclick="openTutorProfile('${esc(t.id)}')">View Profile</button>
-        <button class="btn-primary"  style="flex:2;background:var(--purple);"
-                onclick="openSessionModal('${esc(t.id)}')">Request session</button>
-      </div>
-    </div>
-  `).join('');
-};
+});

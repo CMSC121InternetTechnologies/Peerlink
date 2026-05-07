@@ -19,15 +19,15 @@ class TutorController extends Controller
             ->get();
 
         $formattedTutors = $tutors->map(function ($tutor) {
-            $degree = $tutor->user->program_code . ' ' . $tutor->user->current_year_level;
+            $degree = ($tutor->user?->program_code ?? '') . ' ' . ($tutor->user?->current_year_level ?? '');
             $reviewCount = $tutor->reviews->count();
             $rating = $reviewCount > 0 ? $tutor->reviews->avg('rating') : 0.0;
             $courses = $tutor->courses->pluck('course_code')->unique()->values();
 
             return [
                 'id' => $tutor->user_id,
-                'name' => $tutor->user->first_name . ' ' . $tutor->user->last_name,
-                'initials' => substr($tutor->user->first_name, 0, 1) . substr($tutor->user->last_name, 0, 1),
+                'name' => ($tutor->user?->first_name ?? '') . ' ' . ($tutor->user?->last_name ?? ''),
+                'initials' => substr($tutor->user?->first_name ?? '?', 0, 1) . substr($tutor->user?->last_name ?? '?', 0, 1),
                 'degree' => $degree,
                 'rating' => round($rating, 1),
                 'reviews' => $reviewCount,
@@ -58,9 +58,9 @@ class TutorController extends Controller
 
         return response()->json([
             'id'          => $tutor->user_id,
-            'name'        => $tutor->user->first_name . ' ' . $tutor->user->last_name,
-            'initials'    => substr($tutor->user->first_name, 0, 1) . substr($tutor->user->last_name, 0, 1),
-            'degree'      => $tutor->user->program_code . ' ' . $tutor->user->current_year_level,
+            'name'        => ($tutor->user?->first_name ?? '') . ' ' . ($tutor->user?->last_name ?? ''),
+            'initials'    => substr($tutor->user?->first_name ?? '?', 0, 1) . substr($tutor->user?->last_name ?? '?', 0, 1),
+            'degree'      => ($tutor->user?->program_code ?? '') . ' ' . ($tutor->user?->current_year_level ?? ''),
             'bio'         => $tutor->bio ?? '',
             'rating'      => round((float) $tutor->rating_avg, 1),
             'reviewCount' => $tutor->reviews->count(),

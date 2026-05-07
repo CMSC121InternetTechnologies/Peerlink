@@ -102,6 +102,19 @@ class ProfileApiController extends Controller
             }
         }
 
+        if (array_key_exists('tuteeCourses', $validated)) {
+            $tuteeCourseIds = Course::whereIn('course_code', $validated['tuteeCourses'] ?? [])
+                ->pluck('course_id')
+                ->toArray();
+
+            DB::table('Tutee_Courses')->where('user_id', $user->user_id)->delete();
+            if (!empty($tuteeCourseIds)) {
+                DB::table('Tutee_Courses')->insert(
+                    array_map(fn($cid) => ['user_id' => $user->user_id, 'course_id' => $cid], $tuteeCourseIds)
+                );
+            }
+        }
+
         return response()->json(['message' => 'Profile updated successfully.']);
     }
 
