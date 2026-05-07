@@ -82,6 +82,22 @@ class RequestController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        // Bug: Room::find() and SessionReview::exists() were called inside map(),
+        // firing one extra query per request row (N+1). Fix: batch both lookups
+        // before the loop using a single query each.
+        $counterRoomIds = $requests
+            ->where('status', 'CounterProposed')
+            ->pluck('counter_proposed_room_id')
+            ->filter()
+            ->unique();
+        $counterRooms = Room::whereIn('room_id', $counterRoomIds)->pluck('room_name', 'room_id');
+
+        $sessionIds = $requests->pluck('session.session_id')->filter()->unique()->values();
+        $reviewedSessionIds = SessionReview::whereIn('session_id', $sessionIds)
+            ->where('reviewer_id', $user->user_id)
+            ->pluck('session_id')
+            ->flip(); // keyed by session_id for O(1) lookup
+
         return response()->json([
             'requests' => $requests->map(fn($r) => [
                 'id'        => $r->request_id,
@@ -94,11 +110,11 @@ class RequestController extends Controller
                 'message'   => $r->message,
                 'createdAt' => $r->created_at,
                 'counterProposal' => $r->status === 'CounterProposed' ? [
-                    'proposedTime'     => $r->counter_proposed_time,
-                    'message'          => $r->counter_proposed_message,
-                    'modality'         => $r->counter_proposed_modality,
-                    'room'             => $r->counter_proposed_room_id
-                        ? Room::find($r->counter_proposed_room_id)?->room_name
+                    'proposedTime' => $r->counter_proposed_time,
+                    'message'      => $r->counter_proposed_message,
+                    'modality'     => $r->counter_proposed_modality,
+                    'room'         => $r->counter_proposed_room_id
+                        ? ($counterRooms[$r->counter_proposed_room_id] ?? null)
                         : null,
                 ] : null,
                 'session' => $r->session ? [
@@ -106,9 +122,7 @@ class RequestController extends Controller
                     'modality'      => $r->session->modality,
                     'room'          => $r->session->room?->room_name,
                     'scheduledTime' => $r->session->scheduled_time,
-                    'hasReview'     => SessionReview::where('session_id', $r->session->session_id)
-                        ->where('reviewer_id', $user->user_id)
-                        ->exists(),
+                    'hasReview'     => isset($reviewedSessionIds[$r->session->session_id]),
                 ] : null,
             ]),
         ]);
@@ -123,7 +137,10 @@ class RequestController extends Controller
             'course_code'    => ['required', 'string', 'exists:Courses,course_code'],
             'tutor_id'       => ['nullable', 'string', 'exists:Users,user_id'],
             'message'        => ['nullable', 'string', 'max:1000'],
-            'preferred_date' => ['nullable', 'string'],
+            // Bug: 'string' alone accepted arbitrary text that was then concatenated
+            // directly into the message field. Fix: require a parseable date-time value
+            // so the stored text is always well-formed and future-dated.
+            'preferred_date' => ['nullable', 'date', 'after:now'],
         ]);
 
         $course  = Course::where('course_code', $validated['course_code'])->firstOrFail();
@@ -265,16 +282,11 @@ class RequestController extends Controller
             return response()->json(['message' => 'Counter-proposal accepted and session scheduled.']);
         }
 
-        // --- Student cancels their own pending/counter-proposed request ---
-        // Row is kept with status=Cancelled so the tutee sees the badge.
-        // Tutor's incoming list filters by Pending only, so it disappears for them.
         if ($action === 'cancel') {
-            if ($req->student_id !== $user->user_id) {
+            if ($req->student_id !== $user->user_id)
                 return response()->json(['error' => 'Unauthorized'], 403);
-            }
-            if (!in_array($req->status, ['Pending', 'CounterProposed'])) {
+            if (!in_array($req->status, ['Pending', 'CounterProposed']))
                 return response()->json(['error' => 'Only pending or counter-proposed requests can be cancelled.'], 422);
-            }
 
             $req->status = 'Cancelled';
             $req->save();
@@ -289,14 +301,32 @@ class RequestController extends Controller
                     'is_read'    => false,
                 ]);
             }
-
             return response()->json(['message' => 'Request cancelled.']);
         }
 
         // --- Tutor-side actions ---
         $isBroadcast = $req->tutor_id === null;
-        if (!$isBroadcast && $req->tutor_id !== $user->user_id) {
+
+        if ($isBroadcast) {
+            // Bug: any authenticated user (including the request's own student) could
+            // claim a broadcast because the ownership check was skipped entirely.
+            // Fix: confirm the claimant has a TutorProfile and is not the original student.
+            $isTutor = \App\Models\TutorProfile::where('user_id', $user->user_id)->exists();
+            if (!$isTutor) {
+                return response()->json(['error' => 'Only tutors can claim broadcast requests.'], 403);
+            }
+            if ($req->student_id === $user->user_id) {
+                return response()->json(['error' => 'You cannot claim your own broadcast request.'], 403);
+            }
+        } elseif ($req->tutor_id !== $user->user_id) {
             return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Bug: no status check meant tutors could act on already-Approved, Declined,
+        // or Expired requests, creating duplicate or inconsistent records.
+        // Fix: reject any tutor-side action that is not targeting a Pending request.
+        if ($req->status !== 'Pending') {
+            return response()->json(['error' => 'This request is no longer pending.'], 422);
         }
 
         if ($action === 'decline') {
@@ -407,32 +437,40 @@ class RequestController extends Controller
                 ->first()?->room_id
             ?? 1;
 
-        $req = TutoringRequest::create([
-            'student_id' => $user->user_id,
-            'tutor_id'   => $user->user_id,
-            'course_id'  => $course->course_id,
-            'message'    => '[GROUP] ' . ($validated['message'] ?? ''),
-            'status'     => 'Approved',
-        ]);
+        // Bug: the three inserts (request, session, participant) were separate queries
+        // with no transaction. A failure mid-way left the database in an inconsistent
+        // state (e.g. an Approved request with no session). Fix: wrap all three in a
+        // single atomic transaction so either all succeed or none do.
+        $session = DB::transaction(function () use ($user, $course, $validated, $roomId) {
+            $req = TutoringRequest::create([
+                'student_id' => $user->user_id,
+                'tutor_id'   => $user->user_id,
+                'course_id'  => $course->course_id,
+                'message'    => '[GROUP] ' . ($validated['message'] ?? ''),
+                'status'     => 'Approved',
+            ]);
 
-        $session = TutoringSession::create([
-            'request_id'     => $req->request_id,
-            'modality'       => $validated['modality'],
-            'room_id'        => $roomId,
-            'meeting_link'   => $validated['meeting_link'] ?? null,
-            'scheduled_time' => \Carbon\Carbon::parse($validated['scheduled_time'])->format('Y-m-d H:i:s'),
-            'status'         => 'Scheduled',
-        ]);
+            $session = TutoringSession::create([
+                'request_id'     => $req->request_id,
+                'modality'       => $validated['modality'],
+                'room_id'        => $roomId,
+                'meeting_link'   => $validated['meeting_link'] ?? null,
+                'scheduled_time' => \Carbon\Carbon::parse($validated['scheduled_time'])->format('Y-m-d H:i:s'),
+                'status'         => 'Scheduled',
+            ]);
 
-        // Tutor is the host; no student participant yet (students join later)
-        DB::table('Session_Participants')->insert([
-            'participation_id' => (string) Str::uuid(),
-            'session_id'       => $session->session_id,
-            'user_id'          => $user->user_id,
-            'role'             => 'Tutor',
-            'has_attended'     => null,
-            'joined_at'        => now(),
-        ]);
+            // Tutor is the host; no student participant yet (students join later)
+            DB::table('Session_Participants')->insert([
+                'participation_id' => (string) Str::uuid(),
+                'session_id'       => $session->session_id,
+                'user_id'          => $user->user_id,
+                'role'             => 'Tutor',
+                'has_attended'     => null,
+                'joined_at'        => now(),
+            ]);
+
+            return $session;
+        });
 
         return response()->json(['message' => 'Group session posted.', 'session_id' => $session->session_id], 201);
     }

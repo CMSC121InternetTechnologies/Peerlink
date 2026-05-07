@@ -15,14 +15,23 @@
   <!-- Pass server data to JS -->
   <script>
     window.__onboarding = {{ ($onboarding ?? false) ? 'true' : 'false' }};
-    window.__courses  = {!! json_encode($courses->map(fn($c) => ['code' => $c->course_code, 'name' => $c->course_name])->values()) !!};
-    window.__programs = {!! json_encode($programs->map(fn($p) => ['code' => $p->program_code])->values()) !!};
+    {{-- Bug: {!! json_encode() !!} does not escape <, >, or & by default, allowing a
+         malicious value in the database to break out of the <script> block (XSS).
+         Fix: @json uses JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+         making all angle brackets and ampersands safe inside <script> tags. --}}
+    window.__courses  = @json($courses->map(fn($c) => ['code' => $c->course_code, 'name' => $c->course_name])->values());
+    window.__programs = @json($programs->map(fn($p) => ['code' => $p->program_code])->values());
+    {{-- Bug: auth()->user() was called without null-safety; a corrupted or expired
+         session would cause a fatal "Call to a member function on null" error.
+         Fix: resolve the user once with null-safe operator (?->), falling back to
+         empty strings/zero so the JS app still receives a well-formed object. --}}
+    @php $authUser = auth()->user(); @endphp
     window.__authUser = {
-      firstName:   @json(auth()->user()->first_name),
-      lastName:    @json(auth()->user()->last_name),
-      programCode: @json(auth()->user()->program_code),
-      yearLevel:   @json(auth()->user()->current_year_level),
-      contact:     @json(auth()->user()->contact_number ?? ''),
+      firstName:   @json($authUser?->first_name ?? ''),
+      lastName:    @json($authUser?->last_name ?? ''),
+      programCode: @json($authUser?->program_code ?? ''),
+      yearLevel:   @json($authUser?->current_year_level ?? 0),
+      contact:     @json($authUser?->contact_number ?? ''),
     };
   </script>
 
@@ -138,7 +147,7 @@
       <div class="tutor-only">
         <div class="tutor-dashboard">
           <div class="dashboard-welcome">
-            <h1>Welcome back, <span class="accent">{{ auth()->user()->first_name }}</span> 👋</h1>
+            <h1>Welcome back, <span class="accent">{{ auth()->user()?->first_name ?? '' }}</span> 👋</h1>
             <p>You're in Tutor mode. Manage your sessions and profile below.</p>
           </div>
           <div class="dashboard-cards">
@@ -214,7 +223,7 @@
       <div class="profile-card">
         <div class="profile-header-main">
           <div class="profile-avatar-wrap">
-            <div class="tutor-avatar larger" id="profileAvatar">{{ substr(auth()->user()->first_name,0,1) }}{{ substr(auth()->user()->last_name,0,1) }}</div>
+            <div class="tutor-avatar larger" id="profileAvatar">{{ substr(auth()->user()?->first_name ?? '?', 0, 1) }}{{ substr(auth()->user()?->last_name ?? '?', 0, 1) }}</div>
             <label class="avatar-upload-label" title="Change photo">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -660,6 +669,10 @@
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
-  <script src="{{ asset('app.js') }}?v={{ filemtime(public_path('app.js')) }}"></script>
+  {{-- Bug: filemtime() emits a PHP warning and returns false when app.js does not
+       exist (e.g. before the first build), producing a broken ?v= query string.
+       Fix: check that the file exists before calling filemtime(); fall back to a
+       static version string so the page still loads during development. --}}
+  <script src="{{ asset('app.js') }}?v={{ file_exists(public_path('app.js')) ? filemtime(public_path('app.js')) : '1' }}"></script>
 </body>
 </html>
