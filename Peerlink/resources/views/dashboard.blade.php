@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ asset('style.css') }}"/>
+  <!--<link rel = "stlesheet" hred = "{{ asset('\resources\css\dashboard.css') }}"/>-->
+  @vite(['resources/css/style.css', 'resources/css/register.css', 'resources/js/app.js', 'resources/css/dashboard.css'])
 </head>
 <body class="mode-tutee">
 
@@ -352,13 +354,15 @@
     </div>
   </main>
 
+<!--SESSION REQUEST-->
   <div class="modal-overlay" id="sessionModalOverlay" onclick="closeSessionModal()">
-    <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal" id = "sessionModalContainer" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeSessionModal()">✕</button>
       <div class="modal-avatar" id="modalAvatar"></div>
       <h2 class="modal-name" id="modalName"></h2>
       <p class="modal-sub"  id="modalSub"></p>
-      <div class="modal-form">
+
+      <div class="modal-form" >
         <label>Course</label>
         <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;" onchange="loadSessionTopics()">
           <option value="" disabled selected>Select a course</option>
@@ -374,6 +378,7 @@
         <label>Message (optional)</label>
         <textarea placeholder="Any notes for the tutor…" id="sessionMessage"></textarea>
         <button class="btn-primary full-width" onclick="submitRequest()" style="margin-top:1rem;">Send Request</button>
+
       </div>
     </div>
   </div>
