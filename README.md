@@ -80,7 +80,12 @@ CREATE DATABASE PeerLink CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```bash
 mysql -u root -p PeerLink < database/database.sql
 ```
+alternatively 
+```bash
+USE peerlink
 
+SOURCE [PATH TO SQL FILE]
+```
 ###  Import sample data *(optional but recommended for testing)*
 
 ```bash
