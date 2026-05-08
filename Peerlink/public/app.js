@@ -223,9 +223,11 @@ document.addEventListener('DOMContentLoaded', () => {
   setMode(savedMode);
   switchView(savedView);
 
-  fetchProfile();   // loads bio, tutorCourses, stats, rooms
+  fetchProfile();
   fetchTutors();
   fetchNotifications();
+  fetchTutorRequests();
+  fetchBroadcastRequests();
 
   let notifInterval = setInterval(fetchNotifications, 60000);
   document.addEventListener('visibilitychange', () => {
@@ -753,10 +755,10 @@ function switchReqTab(tab) {
 }
 
 async function fetchTutorRequests() {
-  // Short TTL (30s) — tutor needs to see new student requests quickly.
   await cachedJson('tutorRequests', '/api/requests?role=tutor', 30, (data) => {
     pendingRequests = data.requests || [];
     renderTutorRequests();
+    updateTutorDashboardBadge();
   });
 }
 
@@ -823,6 +825,7 @@ async function fetchBroadcastRequests() {
   await cachedJson('broadcastPool', '/api/requests?role=broadcast', 30, (data) => {
     broadcastRequests = data.requests || [];
     renderBroadcastRequests();
+    updateTutorDashboardBadge();
   });
 }
 
@@ -1908,6 +1911,19 @@ async function loadSessionTopics() {
   }
 }
 
+function updateTutorDashboardBadge() {
+  const badge = document.getElementById('tutorDashboardReqBadge');
+  if (!badge) return;
+  
+  const total = pendingRequests.length + broadcastRequests.length;
+  
+  if (total > 0) {
+    badge.textContent = total > 9 ? '9+' : total;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
 
 // ===== ESC KEY: close any open modal =====
 document.addEventListener('keydown', function (e) {

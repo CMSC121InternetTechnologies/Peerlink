@@ -180,7 +180,10 @@
             </div>
           </div>
           <div class="tutor-cta">
-            <button class="btn-primary"  onclick="openRequestsModal()">View Session Requests</button>
+            <button class="btn-primary" onclick="openRequestsModal()" style="position: relative;">
+              View Session Requests
+              <span class="nav-req-badge" id="tutorDashboardReqBadge" style="display:none; position:absolute; top:-6px; right:-6px; border:2px solid white;">0</span>
+            </button>
             <button class="btn-outline"  onclick="openGroupSessionModal()">Post Group Session</button>
             <button class="btn-outline"  onclick="switchView('profile')">Edit My Profile</button>
           </div>
