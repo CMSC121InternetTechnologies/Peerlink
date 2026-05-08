@@ -108,7 +108,8 @@ Since we are using @vite, we need Node.js to bundle those assets. We must run a 
 Open a new separate terminal (DO NOT CLOSE THE TERMINAL WHERE **php artisan serve** WAS RUNNING) and navigate to the application folder. Run the following commands: 
 
 ```bash
-# Start the Vite server (you do this every time you code)
+# Build and start the Vite server (you do this every time you code)
+npm run build
 npm run dev
 ```
 
