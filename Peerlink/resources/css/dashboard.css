@@ -1,10 +1,43 @@
 .modal {
-  max-height: 90vh; 
-  overflow-y: scroll; 
-  
+  max-height: 90vh;
+  overflow-y: scroll;
+
   /*webkit-overflow-scrolling: touch; //uncomment when ready to deplay and you have optimizes CSS to mobile devices. tnx hehe*/
 }
 
+/* Wider modal variant — used for session request, requests list, tutor profile */
+.modal-lg {
+  max-width: 660px;
+}
+
+/* Onboarding: two-column expertise grid inside the modal */
+#obStep4 .course-edit-grid {
+  gap: 1.25rem;
+}
+
+/* Complete Session modal: green confirm button hover */
+#completeSessionOverlay .btn-primary:hover {
+  background: #43a047;
+}
+
+
+/* Pending-requests counter on My Requests nav link */
+.nav-req-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 9px;
+  background: var(--coral);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
 
 * {
     scrollbar-width: thin;
@@ -40,7 +73,117 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: var(--teal); 
+    background-color: var(--teal);
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    border: 3px solid var(--cream); 
+    border: 3px solid var(--cream);
+}
+
+/* ================================================================
+   TOPIC PICKER  (Course "Topics" card inside the request modal)
+   Tiny pill checkboxes the student can tick to tell the tutor
+   which subtopics of the course they want help with.
+   ================================================================ */
+.topic-picker {
+    margin-bottom: 0.85rem;
+    padding: 0.7rem 0.85rem 0.85rem;
+    background: var(--cream-dark);
+    border: 1px solid #e6dcc1;
+    border-radius: var(--radius);
+}
+.topic-picker-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
+}
+.topic-picker-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #4a4a55;
+}
+.topic-picker-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+/* Single-column scrollable list. Each topic is a full-width row so long
+   names never get truncated and the user can scan straight down.
+   IMPORTANT details:
+   - `overflow-y: scroll` (not `auto`) → scrollbar is ALWAYS visible so the
+     user can tell at a glance there are more topics below the fold. This
+     was the bug: with `auto` + an outer `.modal { overflow-y: scroll }`,
+     the modal itself ate the scroll and the inner list never showed one.
+   - `min-height: 0` lets this grow inside flex containers without being
+     forced to its content size by the default `min-height: auto`.
+   - `overscroll-behavior: contain` keeps the modal from scrolling when the
+     user reaches the top/bottom of this list and keeps spinning the wheel. */
+.topic-picker-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-height: 220px;
+    min-height: 0;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+    /* Inner padding so the focus/hover ring on the right edge isn't
+       clipped by the scrollbar track. */
+    padding-right: 0.35rem;
+}
+.topic-picker-grid::-webkit-scrollbar         { width: 10px; }
+.topic-picker-grid::-webkit-scrollbar-track   {
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+}
+.topic-picker-grid::-webkit-scrollbar-thumb   {
+    background: #b8ad88;
+    border: 2px solid var(--cream-dark);
+    border-radius: 8px;
+}
+.topic-picker-grid::-webkit-scrollbar-thumb:hover { background: #9a8e6a; }
+/* Firefox: thin always-visible scrollbar matching the WebKit colors. */
+.topic-picker-grid {
+    scrollbar-width: thin;
+    scrollbar-color: #b8ad88 rgba(0, 0, 0, 0.04);
+}
+
+.topic-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border: 1px solid #d8cfb6;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    line-height: 1.25;
+    color: #3d3d4a;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.05s ease;
+}
+.topic-chip:hover {
+    background: var(--purple-light);
+    border-color: var(--purple);
+}
+.topic-chip:active { transform: scale(0.99); }
+.topic-chip input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: var(--purple);
+    cursor: pointer;
+}
+.topic-chip > span { flex: 1; }
+.topic-chip.checked {
+    background: var(--purple);
+    border-color: var(--purple-dark);
+    color: white;
+    font-weight: 500;
+}
+.topic-chip.checked input[type="checkbox"] {
+    accent-color: white;
 }

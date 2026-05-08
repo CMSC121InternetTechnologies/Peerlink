@@ -8,6 +8,7 @@ use App\Models\TutorProfile;
 use App\Models\TutoringRequest;
 use App\Models\TutoringSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -51,7 +52,14 @@ class ProfileApiController extends Controller
             'coursesCount'     => count($tutorCourses),
             'ratingAvg'        => $tutorProfile ? (float) $tutorProfile->rating_avg : 0.0,
             'upcomingSessions' => $upcomingSessions,
-            'rooms'            => Room::all(['room_id', 'room_code', 'room_name', 'room_type']),
+            // Rooms list is read on every profile fetch but virtually never changes.
+            // Cache for 1 hour using Laravel's file cache. Any admin tool that
+            // adds/edits rooms should call Cache::forget('peerlink.rooms') after.
+            'rooms'            => Cache::remember(
+                'peerlink.rooms',
+                3600,
+                fn() => Room::all(['room_id', 'room_code', 'room_name', 'room_type'])
+            ),
             'firstName'        => $user->first_name,
             'lastName'         => $user->last_name,
             'programCode'      => $user->program_code,

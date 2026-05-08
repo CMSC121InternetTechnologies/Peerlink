@@ -18,6 +18,95 @@ class DatabaseSeeder extends Seeder
         $isMySQL = DB::getDriverName() === 'mysql';
         if ($isMySQL) DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
+        // ── Base lookup tables (Divisions, Programs, Courses, Rooms) ──────────
+        // These were previously loaded from a separate database.sql file that is
+        // not version-controlled. They are now seeded here so that migrate:fresh
+        // --seed produces a complete, self-contained database from scratch.
+        DB::table('Divisions')->insertOrIgnore([
+            ['division_id' => 'DH',   'division_name' => 'Division of Humanities'],
+            ['division_id' => 'DM',   'division_name' => 'Division of Management'],
+            ['division_id' => 'DNSM', 'division_name' => 'Division of Natural Sciences and Mathematics'],
+            ['division_id' => 'DSS',  'division_name' => 'Division of Social Sciences'],
+        ]);
+
+        DB::table('Programs')->insertOrIgnore([
+            // Division of Humanities
+            ['program_code' => 'BALit',    'division_id' => 'DH',   'program_name' => 'BA Literature'],
+            ['program_code' => 'BAMedia',  'division_id' => 'DH',   'program_name' => 'BA Media Arts'],
+            // Division of Management
+            ['program_code' => 'BSAcc',    'division_id' => 'DM',   'program_name' => 'BS Accountancy'],
+            ['program_code' => 'BSMgt',    'division_id' => 'DM',   'program_name' => 'BS Management'],
+            ['program_code' => 'MM',       'division_id' => 'DM',   'program_name' => 'Master of Management'],
+            // Division of Natural Sciences and Mathematics
+            ['program_code' => 'BSAMath',  'division_id' => 'DNSM', 'program_name' => 'BS Applied Mathematics'],
+            ['program_code' => 'BSBio',    'division_id' => 'DNSM', 'program_name' => 'BS Biology'],
+            ['program_code' => 'BSCS',     'division_id' => 'DNSM', 'program_name' => 'BS Computer Science'],
+            ['program_code' => 'MSEnvSci', 'division_id' => 'DNSM', 'program_name' => 'MS Environmental Science'],
+            // Division of Social Sciences
+            ['program_code' => 'BAPsych',  'division_id' => 'DSS',  'program_name' => 'BA Psychology'],
+            ['program_code' => 'BSEcon',   'division_id' => 'DSS',  'program_name' => 'BS Economics'],
+        ]);
+
+        // Courses: specific course_ids are hard-coded in Tutor_Expertise, Requests,
+        // and Sessions seed rows, so each ID must match exactly.
+        DB::table('Courses')->insertOrIgnore([
+            ['course_id' => 1,  'division_id' => 'DNSM', 'course_code' => 'CMSC1',   'course_name' => 'Introduction to Computing Systems'],
+            ['course_id' => 2,  'division_id' => 'DNSM', 'course_code' => 'CMSC2',   'course_name' => 'Digital Circuits and Systems'],
+            ['course_id' => 3,  'division_id' => 'DNSM', 'course_code' => 'CMSC10',  'course_name' => 'Introduction to Computing'],
+            ['course_id' => 4,  'division_id' => 'DNSM', 'course_code' => 'CMSC11',  'course_name' => 'Introduction to Computer Science I'],
+            ['course_id' => 5,  'division_id' => 'DNSM', 'course_code' => 'CMSC12',  'course_name' => 'Introduction to Computer Science II'],
+            ['course_id' => 6,  'division_id' => 'DNSM', 'course_code' => 'CMSC121', 'course_name' => 'Fundamentals of Web Development'],
+            ['course_id' => 7,  'division_id' => 'DNSM', 'course_code' => 'CMSC122', 'course_name' => 'Data Structures and Algorithms'],
+            ['course_id' => 8,  'division_id' => 'DNSM', 'course_code' => 'CMSC130', 'course_name' => 'Automata Theory and Formal Languages'],
+            ['course_id' => 9,  'division_id' => 'DNSM', 'course_code' => 'CMSC131', 'course_name' => 'Computer Organization and Assembly Language'],
+            ['course_id' => 10, 'division_id' => 'DNSM', 'course_code' => 'CMSC132', 'course_name' => 'Operating Systems'],
+            ['course_id' => 11, 'division_id' => 'DNSM', 'course_code' => 'CMSC135', 'course_name' => 'Analysis of Algorithms'],
+            ['course_id' => 12, 'division_id' => 'DNSM', 'course_code' => 'CMSC13',  'course_name' => 'Discrete Mathematical Structures I'],
+            ['course_id' => 13, 'division_id' => 'DNSM', 'course_code' => 'CMSC140', 'course_name' => 'Programming Languages'],
+            ['course_id' => 14, 'division_id' => 'DNSM', 'course_code' => 'CMSC150', 'course_name' => 'Numerical and Symbolic Computation'],
+            ['course_id' => 15, 'division_id' => 'DNSM', 'course_code' => 'CMSC197', 'course_name' => 'Machine Learning'],
+            ['course_id' => 16, 'division_id' => 'DNSM', 'course_code' => 'CMSC198', 'course_name' => 'Special Topics in Computer Science'],
+            ['course_id' => 17, 'division_id' => 'DNSM', 'course_code' => 'MATH11',  'course_name' => 'College Algebra'],
+            ['course_id' => 18, 'division_id' => 'DNSM', 'course_code' => 'MATH14',  'course_name' => 'Plane and Spherical Trigonometry'],
+            ['course_id' => 19, 'division_id' => 'DNSM', 'course_code' => 'MATH17',  'course_name' => 'Algebra and Trigonometry'],
+            ['course_id' => 20, 'division_id' => 'DNSM', 'course_code' => 'MATH55',  'course_name' => 'Elementary Analysis I'],
+            ['course_id' => 21, 'division_id' => 'DNSM', 'course_code' => 'MATH56',  'course_name' => 'Elementary Analysis II'],
+            ['course_id' => 22, 'division_id' => 'DNSM', 'course_code' => 'MATH18',  'course_name' => 'Analytic Geometry and Calculus I'],
+            ['course_id' => 23, 'division_id' => 'DNSM', 'course_code' => 'MATH60',  'course_name' => 'Linear Algebra I'],
+            ['course_id' => 24, 'division_id' => 'DNSM', 'course_code' => 'MATH61',  'course_name' => 'Linear Algebra II'],
+            ['course_id' => 25, 'division_id' => 'DNSM', 'course_code' => 'MATH100', 'course_name' => 'Mathematics for Science Students'],
+            ['course_id' => 26, 'division_id' => 'DNSM', 'course_code' => 'MATH114', 'course_name' => 'Combinatorics'],
+            ['course_id' => 27, 'division_id' => 'DNSM', 'course_code' => 'MATH115', 'course_name' => 'Graph Theory'],
+            ['course_id' => 28, 'division_id' => 'DNSM', 'course_code' => 'MATH121', 'course_name' => 'Abstract Algebra I'],
+            ['course_id' => 29, 'division_id' => 'DNSM', 'course_code' => 'MATH131', 'course_name' => 'Differential Equations'],
+            ['course_id' => 30, 'division_id' => 'DNSM', 'course_code' => 'MATH133', 'course_name' => 'Mathematical Analysis I'],
+            ['course_id' => 31, 'division_id' => 'DNSM', 'course_code' => 'MATH150', 'course_name' => 'Numerical Analysis I'],
+            ['course_id' => 32, 'division_id' => 'DNSM', 'course_code' => 'MATH151', 'course_name' => 'Numerical Analysis II'],
+            ['course_id' => 33, 'division_id' => 'DNSM', 'course_code' => 'STAT105', 'course_name' => 'Statistical Methods I'],
+        ]);
+
+        // Course Topics 1–9 are for CMSC121 (course_id 6). Topics 10–21 are inserted
+        // later in this seeder alongside the other sample content.
+        DB::table('Course_Topics')->insertOrIgnore([
+            ['topic_id' => 1, 'course_id' => 6, 'topic_name' => 'Introduction to HTML and CSS'],
+            ['topic_id' => 2, 'course_id' => 6, 'topic_name' => 'CSS Layouts and Responsive Design'],
+            ['topic_id' => 3, 'course_id' => 6, 'topic_name' => 'PHP Basics and Server-Side Scripting'],
+            ['topic_id' => 4, 'course_id' => 6, 'topic_name' => 'JavaScript and DOM Manipulation'],
+            ['topic_id' => 5, 'course_id' => 6, 'topic_name' => 'Building Client-Side Web Applications'],
+            ['topic_id' => 6, 'course_id' => 6, 'topic_name' => 'Database Design and SQL'],
+            ['topic_id' => 7, 'course_id' => 6, 'topic_name' => 'MVC Architecture and Routing'],
+            ['topic_id' => 8, 'course_id' => 6, 'topic_name' => 'Web Frameworks (Laravel)'],
+            ['topic_id' => 9, 'course_id' => 6, 'topic_name' => 'Web Security and Authentication'],
+        ]);
+
+        // Rooms: room_ids 1–3 are hard-coded in Sessions and counter-proposal seed rows.
+        DB::table('Rooms')->insertOrIgnore([
+            ['room_id' => 1, 'room_code' => 'CSLAB2', 'room_name' => 'CS Lab 2',     'room_type' => 'Physical', 'capacity' => 30],
+            ['room_id' => 2, 'room_code' => 'CSLAB1', 'room_name' => 'CS Lab 1',     'room_type' => 'Physical', 'capacity' => 25],
+            ['room_id' => 3, 'room_code' => 'GMEET',  'room_name' => 'Google Meet',  'room_type' => 'Virtual',  'capacity' => 50],
+            ['room_id' => 4, 'room_code' => 'ZOOM',   'room_name' => 'Zoom Meeting', 'room_type' => 'Virtual',  'capacity' => 50],
+        ]);
+
         $pw = Hash::make('password');
 
         // ── Users ─────────────────────────────────────────────────────────────
@@ -28,7 +117,7 @@ class DatabaseSeeder extends Seeder
             ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'email' => 'ramon.delapena@up.edu.ph', 'password_hash' => $pw, 'first_name' => 'Ramon',   'middle_name' => null,  'last_name' => 'dela Pena', 'contact_number' => '09171234003', 'current_year_level' => 4, 'program_code' => 'BSCS',  'created_at' => '2026-01-12 08:00:00'],
             ['user_id' => 'aaaa0004-0004-0004-0004-000000000004', 'email' => 'bianca.reyes@up.edu.ph',   'password_hash' => $pw, 'first_name' => 'Bianca',  'middle_name' => 'C.',  'last_name' => 'Reyes',     'contact_number' => '09171234004', 'current_year_level' => 2, 'program_code' => 'BSCS',  'created_at' => '2026-01-15 08:00:00'],
             ['user_id' => 'aaaa0005-0005-0005-0005-000000000005', 'email' => 'carlo.manalo@up.edu.ph',   'password_hash' => $pw, 'first_name' => 'Carlo',   'middle_name' => 'D.',  'last_name' => 'Manalo',    'contact_number' => '09171234005', 'current_year_level' => 1, 'program_code' => 'BSCS',  'created_at' => '2026-01-16 08:00:00'],
-            ['user_id' => 'aaaa0006-0006-0006-0006-000000000006', 'email' => 'diana.lim@up.edu.ph',      'password_hash' => $pw, 'first_name' => 'Diana',   'middle_name' => null,  'last_name' => 'Lim',       'contact_number' => '09171234006', 'current_year_level' => 2, 'program_code' => 'BSBio', 'created_at' => '2026-01-17 08:00:00'],
+            ['user_id' => 'aaaa0006-0006-0006-0006-000000000006', 'email' => 'diana.lim@up.edu.ph',      'password_hash' => $pw, 'first_name' => 'Diana',   'middle_name' => null,  'last_name' => 'Lim',       'contact_number' => '09171234006', 'current_year_level' => 2, 'program_code' => 'BAPsych', 'created_at' => '2026-01-17 08:00:00'],
             ['user_id' => 'aaaa0007-0007-0007-0007-000000000007', 'email' => 'elena.navarro@up.edu.ph',  'password_hash' => $pw, 'first_name' => 'Elena',   'middle_name' => 'F.',  'last_name' => 'Navarro',   'contact_number' => '09171234007', 'current_year_level' => 3, 'program_code' => 'BSCS',  'created_at' => '2026-01-18 08:00:00'],
             ['user_id' => 'aaaa0008-0008-0008-0008-000000000008', 'email' => 'francis.tan@up.edu.ph',    'password_hash' => $pw, 'first_name' => 'Francis', 'middle_name' => null,  'last_name' => 'Tan',       'contact_number' => '09171234008', 'current_year_level' => 2, 'program_code' => 'BSCS',  'created_at' => '2026-01-19 08:00:00'],
         ]);

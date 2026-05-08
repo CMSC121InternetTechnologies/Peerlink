@@ -30,17 +30,28 @@ return new class extends Migration
 
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
-        // Re-populate with correct course_ids
-        DB::table('Tutor_Expertise')->insert([
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'course_id' => 6],  // Alex: CMSC121
-            ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'course_id' => 7],  // Alex: CMSC122
-            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'course_id' => 22], // Maria: MATH18
-            ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'course_id' => 33], // Maria: STAT105
-            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'course_id' => 4],  // Ramon: CMSC11
-            ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'course_id' => 5],  // Ramon: CMSC12
-            ['user_id' => 'aaaa0007-0007-0007-0007-000000000007', 'course_id' => 12], // Elena: CMSC13
-            ['user_id' => 'aaaa0008-0008-0008-0008-000000000008', 'course_id' => 3],  // Francis: CMSC10
-        ]);
+        // This block was written as a data-fix for upgrading an existing database.
+        // On a fresh migrate:fresh the Tutor_Profiles table is empty at this point
+        // because the seeder has not run yet, so the FK constraint fails.
+        // Guard: only re-seed if the seed users already exist in Tutor_Profiles
+        // (i.e. the DB was bootstrapped from database.sql, not from a fresh migration).
+        // The DatabaseSeeder inserts the same rows for a clean install.
+        $seedUserExists = DB::table('Tutor_Profiles')
+            ->where('user_id', 'aaaa0001-0001-0001-0001-000000000001')
+            ->exists();
+
+        if ($seedUserExists) {
+            DB::table('Tutor_Expertise')->insert([
+                ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'course_id' => 6],
+                ['user_id' => 'aaaa0001-0001-0001-0001-000000000001', 'course_id' => 7],
+                ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'course_id' => 22],
+                ['user_id' => 'aaaa0002-0002-0002-0002-000000000002', 'course_id' => 33],
+                ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'course_id' => 4],
+                ['user_id' => 'aaaa0003-0003-0003-0003-000000000003', 'course_id' => 5],
+                ['user_id' => 'aaaa0007-0007-0007-0007-000000000007', 'course_id' => 12],
+                ['user_id' => 'aaaa0008-0008-0008-0008-000000000008', 'course_id' => 3],
+            ]);
+        }
     }
 
     public function down(): void

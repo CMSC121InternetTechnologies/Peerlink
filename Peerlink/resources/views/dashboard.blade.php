@@ -7,8 +7,10 @@
   <title>PeerLink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ asset('style.css') }}"/>
-  @vite(['resources/css/style.css', 'resources/js/app.js', 'resources/css/dashboard.css'])
+  {{-- @vite() injects <link> tags for every CSS file and a <script> for app.js.
+       The old asset('style.css') hard-link was removed to avoid loading the
+       stylesheet twice (once from public/ and once through the Vite pipeline). --}}
+  @vite(['resources/css/style.css', 'resources/css/dashboard.css', 'resources/css/register.css', 'resources/js/app.js'])
 </head>
 <body class="mode-tutee">
 
@@ -27,6 +29,9 @@
          empty strings/zero so the JS app still receives a well-formed object. --}}
     @php $authUser = auth()->user(); @endphp
     window.__authUser = {
+      // userId is used to namespace the localStorage cache so a different
+      // user logging in on the same browser never sees the previous user's data.
+      userId:      @json($authUser?->user_id ?? ''),
       firstName:   @json($authUser?->first_name ?? ''),
       lastName:    @json($authUser?->last_name ?? ''),
       programCode: @json($authUser?->program_code ?? ''),
@@ -44,7 +49,7 @@
 
     <div class="nav-links">
       <a href="#" class="nav-link" id="navDashboard"   onclick="switchView('dashboard')">Explore Tutors</a>
-      <a href="#" class="nav-link" id="navMyRequests"  onclick="switchView('myRequests')">My Requests</a>
+      <a href="#" class="nav-link" id="navMyRequests"  onclick="switchView('myRequests')">My Requests<span class="nav-req-badge" id="reqBadge" style="display:none;"></span></a>
       <a href="#" class="nav-link" id="navMySessions"  onclick="switchView('mySessions')">My Sessions</a>
       <a href="#" class="nav-link" id="navProfile"     onclick="switchView('profile')">Profile</a>
     </div>
@@ -90,8 +95,10 @@
       </button>
     </div>
 
-    <!-- Logout Button -->
-    <form method="POST" action="{{ route('logout') }}" style="display: flex; align-items: center;">
+    <!-- Logout Button — wipes the per-user localStorage cache before the form submits
+         so a different user logging in on the same browser never sees prior data. -->
+    <form id="logoutForm" method="POST" action="{{ route('logout') }}" style="display: flex; align-items: center;"
+          onsubmit="try { window.cache && window.cache.clearAll(); } catch(_){}">
       @csrf
       <button type="submit" class="btn-logout" title="Log out safely">Log out</button>
     </form>
@@ -132,6 +139,11 @@
                 </div>
               </div>
             </div>
+            <!-- Broadcast Request button — sits next to the Course code filter.
+                 Posts a request with tutor_id:null so any tutor can claim it. -->
+            <button class="btn-primary" id="broadcastRequestBtn" title="Post a request that any tutor can claim">
+              Broadcast a Request
+            </button>
           </div>
         </div>
         <div class="tutors-grid" id="tutorsGrid"></div>
@@ -219,7 +231,7 @@
     </div>
 
     <!-- ===== PROFILE VIEW ===== -->
-    <div id="profileView" class="profile-container">
+    <div id="profileView" class="profile-container" style="display:none;">
       <div class="profile-card">
         <div class="profile-header-main">
           <div class="profile-avatar-wrap">
@@ -229,14 +241,14 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
-              <input type="file" accept="image/*" id="photoInput" style="display:none;" onchange="handlePhotoSelect(this)">
+              <input type="file" accept="image/*" id="photoInput" style="display:none;">
             </label>
           </div>
           <div class="profile-meta">
             <h1 id="profileDisplayName">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</h1>
             <div class="role-badge" id="roleBadge"></div>
           </div>
-          <button class="btn-outline" onclick="toggleEditMode(true)">Edit Profile</button>
+          <button class="btn-outline" id="editProfileBtn">Edit Profile</button>
         </div>
 
         <!-- View mode -->
@@ -262,7 +274,7 @@
               <div class="personal-info-row"><span class="info-label">Year Level</span><span id="displayYearLevel">—</span></div>
               <div class="personal-info-row"><span class="info-label">Contact</span><span id="displayContact">—</span></div>
             </div>
-            <button class="btn-outline" onclick="togglePersonalEdit(true)" style="margin-top:.75rem;font-size:.85rem;padding:.4rem .9rem;">Edit Info</button>
+            <button class="btn-outline" id="editPersonalInfoBtn" style="margin-top:.75rem;font-size:.85rem;padding:.4rem .9rem;">Edit Info</button>
             <div id="personalEditForm" style="display:none;margin-top:1rem;">
               <div class="course-edit-grid" style="margin-bottom:.75rem;">
                 <div class="input-group">
@@ -284,15 +296,15 @@
                 <input type="text" id="contactInput" placeholder="e.g. 09171234567" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
               </div>
               <div style="display:flex;gap:.75rem;">
-                <button class="btn-outline" onclick="togglePersonalEdit(false)">Cancel</button>
-                <button class="btn-primary" onclick="savePersonalInfo()">Save</button>
+                <button class="btn-outline" id="cancelPersonalEditBtn">Cancel</button>
+                <button class="btn-primary" id="savePersonalInfoBtn">Save</button>
               </div>
             </div>
           </section>
 
           <section class="profile-section" style="margin-top:2rem;">
             <h3>Password</h3>
-            <button class="btn-outline" onclick="togglePasswordChange(true)" id="pwChangeTrigger" style="font-size:.85rem;padding:.4rem .9rem;">Change Password</button>
+            <button class="btn-outline" id="pwChangeTrigger" style="font-size:.85rem;padding:.4rem .9rem;">Change Password</button>
             <div id="passwordChangeForm" style="display:none;margin-top:1rem;">
               <div class="input-group" style="margin-bottom:.75rem;">
                 <label>Current Password</label>
@@ -307,8 +319,8 @@
                 <input type="password" id="confirmPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
               </div>
               <div style="display:flex;gap:.75rem;">
-                <button class="btn-outline" onclick="togglePasswordChange(false)">Cancel</button>
-                <button class="btn-primary" onclick="changePassword()">Update Password</button>
+                <button class="btn-outline" id="cancelPasswordBtn">Cancel</button>
+                <button class="btn-primary" id="updatePasswordBtn">Update Password</button>
               </div>
             </div>
           </section>
@@ -316,12 +328,12 @@
           <div class="danger-zone">
             <h4>Danger Zone</h4>
             <p class="danger-text">This action is permanent and cannot be undone.</p>
-            <button class="btn-danger-outline" onclick="openDeleteModal()">Delete Account</button>
+            <button class="btn-danger-outline" id="deleteAccountBtn">Delete Account</button>
           </div>
         </div>
 
         <!-- Edit mode -->
-        <form id="profileEditMode" style="display:none;" onsubmit="saveProfile(event)">
+        <form id="profileEditMode" style="display:none;">
           <div class="edit-layout">
             <div class="input-group">
               <label>Bio</label>
@@ -333,7 +345,7 @@
             <div class="course-edit-grid">
               <div class="input-group">
                 <label>Expertise (Tutor)</label>
-                <select class="select-course" id="tutorSelect" onchange="addProfileCourse('tutor')">
+                <select class="select-course" id="tutorSelect">
                   <option value="" disabled selected>+ Add Course</option>
                   @foreach($courses as $course)
                     <option value="{{ $course->course_code }}">{{ $course->course_code }} - {{ $course->course_name }}</option>
@@ -343,7 +355,7 @@
               </div>
               <div class="input-group">
                 <label>Learning Goals (Tutee)</label>
-                <select class="select-course" id="tuteeSelect" onchange="addProfileCourse('tutee')">
+                <select class="select-course" id="tuteeSelect">
                   <option value="" disabled selected>+ Add Course</option>
                   @foreach($courses as $course)
                     <option value="{{ $course->course_code }}">{{ $course->course_code }} - {{ $course->course_name }}</option>
@@ -353,7 +365,7 @@
               </div>
             </div>
             <div class="form-actions-spacer">
-              <button type="button" class="btn-outline" onclick="toggleEditMode(false)">Cancel</button>
+              <button type="button" class="btn-outline" id="cancelProfileEditBtn">Cancel</button>
               <button type="submit" class="btn-primary">Save Changes</button>
             </div>
           </div>
@@ -364,7 +376,7 @@
 
 <!--SESSION REQUEST-->
   <div class="modal-overlay" id="sessionModalOverlay" onclick="closeSessionModal()">
-    <div class="modal" id = "sessionModalContainer" onclick="event.stopPropagation()">
+    <div class="modal modal-lg" id = "sessionModalContainer" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeSessionModal()">✕</button>
       <div class="modal-avatar" id="modalAvatar"></div>
       <h2 class="modal-name" id="modalName"></h2>
@@ -375,9 +387,12 @@
         <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;" onchange="loadSessionTopics()">
           <option value="" disabled selected>Select a course</option>
         </select>
-        <div id="sessionTopicsWrap" style="display:none;margin-bottom:.75rem;">
-          <label style="display:block;margin-bottom:.4rem;">Topics (optional)</label>
-          <div id="sessionTopicsList" style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem;background:var(--cream-dark);border-radius:var(--radius-sm);"></div>
+        <div id="sessionTopicsWrap" class="topic-picker" style="display:none;">
+          <div class="topic-picker-header">
+            <span class="topic-picker-label">Topics</span>
+            <span class="topic-picker-hint">Optional · pick anything you want help with</span>
+          </div>
+          <div id="sessionTopicsList" class="topic-picker-grid"></div>
         </div>
         <label>Additional Notes</label>
         <input type="text" placeholder="e.g. Pointers in C, Recursion…" id="sessionTopic"/>
@@ -593,17 +608,29 @@
         </div>
       </div>
 
-      <!-- Step 4: Add Courses to Tutor (US_07 — real save) -->
+      <!-- Step 4: Set Up Courses (US_07 — real save) -->
       <div class="ob-step" id="obStep4" style="display:none;">
-        <h2 style="margin-bottom:.25rem;">Step 3 — List Your Tutor Courses</h2>
-        <p style="color:var(--text-muted);margin-bottom:1rem;font-size:.9rem;">
-          Add <strong>at least one course</strong> you're comfortable tutoring.
-          This makes you visible to learners in the Explore tab.
+        <h2 style="margin-bottom:.25rem;">Step 3 — Set Up Your Courses</h2>
+        <p style="color:var(--text-muted);margin-bottom:1.25rem;font-size:.9rem;">
+          Tell us which courses you can <strong>tutor</strong> and which you <strong>need help with</strong>.
         </p>
-        <select id="obCourseSelect" class="select-course" style="margin-bottom:.5rem;" onchange="obAddCourse()">
-          <option value="" disabled selected>+ Add a course you can tutor</option>
-        </select>
-        <div id="obCourseTags" class="edit-tags-container" style="margin-bottom:1.25rem;"></div>
+        <div class="course-edit-grid" style="margin-bottom:1.25rem;">
+          <div class="input-group">
+            <label style="font-size:.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--teal-dark);">Courses I Can Tutor</label>
+            <select id="obCourseSelect" class="select-course" onchange="obAddCourse()">
+              <option value="" disabled selected>+ Add a course</option>
+            </select>
+            <div id="obCourseTags" class="edit-tags-container" style="min-height:2rem;margin-top:.5rem;"></div>
+          </div>
+          <div class="input-group">
+            <label style="font-size:.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--coral);">Courses I Need Help With</label>
+            <select id="obTuteeCourseSelect" class="select-course" onchange="obAddTuteeCourse()">
+              <option value="" disabled selected>+ Add a course</option>
+            </select>
+            <div id="obTuteeTags" class="edit-tags-container" style="min-height:2rem;margin-top:.5rem;"></div>
+          </div>
+        </div>
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem;">ℹ️ At least one tutor course is required to appear in Explore Tutors.</p>
         <div style="display:flex;gap:.75rem;">
           <button class="btn-outline" onclick="obPrev()">← Back</button>
           <button class="btn-primary" style="flex:1;" id="obFinishBtn" onclick="obFinish()">Finish &amp; Go to Dashboard</button>
@@ -666,13 +693,29 @@
     </div>
   </div>
 
+  <!-- ===== COMPLETE SESSION MODAL (Task 5) ===== -->
+  <div class="modal-overlay" id="completeSessionOverlay">
+    <div class="modal" id="completeSessionModal">
+      <button class="modal-close" id="closeCompleteBtn">✕</button>
+      <div style="font-size:1.6rem;margin-bottom:.5rem;">✅</div>
+      <h2 style="margin-bottom:.25rem;">Mark Session as Complete</h2>
+      <p style="color:var(--text-muted);margin-bottom:1.25rem;font-size:.9rem;line-height:1.5;">
+        Confirm that this session took place. Students will be prompted to leave a review.
+      </p>
+      <input type="hidden" id="completeSessionId"/>
+      <div class="modal-form">
+        <label>Post-Session Summary <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+        <textarea id="completeSummary" placeholder="Brief notes on topics covered, progress made, or next steps…" style="min-height:90px;"></textarea>
+        <button class="btn-primary full-width" id="confirmCompleteBtn" style="margin-top:1rem;background:#4caf50;">Confirm &amp; Complete</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast"></div>
-
-  {{-- Bug: filemtime() emits a PHP warning and returns false when app.js does not
-       exist (e.g. before the first build), producing a broken ?v= query string.
-       Fix: check that the file exists before calling filemtime(); fall back to a
-       static version string so the page still loads during development. --}}
-  <script src="{{ asset('app.js') }}?v={{ file_exists(public_path('app.js')) ? filemtime(public_path('app.js')) : '1' }}"></script>
+  {{-- public/app.js is plain JS (no ES-module imports, no Alpine). It must be
+       loaded as a classic <script defer> AFTER the DOM so its DOMContentLoaded
+       listener fires correctly. @vite handles Alpine separately above. --}}
+  <script defer src="{{ asset('app.js') }}?v={{ filemtime(public_path('app.js')) }}"></script>
 </body>
 </html>

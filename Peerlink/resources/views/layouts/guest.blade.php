@@ -6,7 +6,9 @@
     <title>PeerLink - Authentication</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('style.css') }}">
+    {{-- Switched from asset() to @vite() so the guest layout uses the same Vite
+         pipeline as the dashboard, enabling HMR on the login/register pages. --}}
+    @vite(['resources/css/style.css'])
 </head>
 <body class="mode-tutee" style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
     

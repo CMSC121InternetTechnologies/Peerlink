@@ -54,11 +54,18 @@ async function apiPatch(url, body) {
     showToast('Session error — please refresh the page (F5).');
     return null;
   }
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.error('PATCH network error', url, e);
+    showToast('Could not reach the server — make sure it is running.');
+    return null;
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.error || err.message || `Error ${res.status}`;
@@ -67,7 +74,9 @@ async function apiPatch(url, body) {
     console.error('PATCH', url, res.status, err);
     return null;
   }
-  return res.json().catch(() => null);
+  // Return {} instead of null on JSON parse failure so callers don't mistake
+  // a successful 200 response for an error just because the body was empty.
+  return res.json().catch(() => ({}));
 }
 
 async function apiPost(url, body) {
@@ -76,11 +85,18 @@ async function apiPost(url, body) {
     showToast('Session error — please refresh the page (F5).');
     return null;
   }
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.error('POST network error', url, e);
+    showToast('Could not reach the server — make sure it is running.');
+    return null;
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.error || err.message || `Error ${res.status}`;
@@ -89,7 +105,7 @@ async function apiPost(url, body) {
     console.error('POST', url, res.status, err);
     return null;
   }
-  return res;
+  return res.json().catch(() => ({}));
 }
 
 function showToast(message) {
@@ -97,6 +113,84 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ============================================================================
+// LOCALSTORAGE CACHE — instant reloads with stale-while-revalidate
+// ----------------------------------------------------------------------------
+// Each entry is { data, expiresAt }. The key is namespaced by user_id so a
+// different user logging in on the same browser never sees prior data.
+// Quota errors (e.g. when a profile photo data-URL is too big) are silently
+// swallowed — caching is a best-effort optimisation, never a correctness path.
+// ============================================================================
+const CACHE_PREFIX = 'pl_cache_';
+function _cacheKey(key) {
+  const uid = (window.__authUser && window.__authUser.userId) || 'anon';
+  return `${CACHE_PREFIX}${uid}:${key}`;
+}
+const cache = {
+  set(key, data, ttlSeconds = 300) {
+    try {
+      localStorage.setItem(_cacheKey(key), JSON.stringify({
+        data, expiresAt: Date.now() + ttlSeconds * 1000,
+      }));
+    } catch (e) { /* quota exceeded — silent */ }
+  },
+  // Returns { data, fresh } or null. `fresh` is true if not yet expired.
+  get(key) {
+    try {
+      const raw = localStorage.getItem(_cacheKey(key));
+      if (!raw) return null;
+      const item = JSON.parse(raw);
+      return { data: item.data, fresh: Date.now() <= item.expiresAt };
+    } catch { return null; }
+  },
+  invalidate(...keys) {
+    keys.forEach(k => { try { localStorage.removeItem(_cacheKey(k)); } catch {} });
+  },
+  // Wipe every cache key for this user — call on logout.
+  clearAll() {
+    try {
+      const prefix = _cacheKey('');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+      }
+    } catch {}
+  },
+};
+
+// Stale-while-revalidate JSON fetcher.
+//   onData(data) is called twice when there is stale cache:
+//     1) immediately with the cached data (fresh=false → instant UI)
+//     2) again with fresh server data once it arrives (only if it actually changed)
+//   When there's no cache at all it's called once with the server data.
+async function cachedJson(key, url, ttlSeconds, onData) {
+  const cached = cache.get(key);
+  let cachedSerialised = null;
+
+  // 1) Render from cache first if we have one (even if stale).
+  if (cached) {
+    cachedSerialised = JSON.stringify(cached.data);
+    onData(cached.data, /* fromCache */ true);
+    if (cached.fresh) return cached.data; // still fresh — skip network
+  }
+
+  // 2) Fetch fresh in the background (or as the only fetch if no cache).
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) return cached?.data ?? null;
+    const data = await res.json();
+    cache.set(key, data, ttlSeconds);
+    // Only re-render if the data actually changed — avoids needless flicker.
+    if (cachedSerialised !== JSON.stringify(data)) onData(data, /* fromCache */ false);
+    return data;
+  } catch {
+    return cached?.data ?? null;
+  }
 }
 
 // ===== STATE =====
@@ -109,7 +203,9 @@ let allUniqueCourses = new Set();
 let selectedTutor = null;
 let dropdownOpen = false;
 let notifDropdownOpen = false;
-let dismissedNotifIds = new Set(); // IDs marked as read this session — filtered out even if poll returns them
+let dismissedNotifIds = new Set(
+  JSON.parse(localStorage.getItem('pl_seenNotifs') || '[]')
+); // persisted across reloads so seen notifications don't reappear
 let lastFetchedNotifs = [];        // most recent poll result, used to populate dismissedNotifIds
 let myRequestsData = [];
 let myIncomingRequests = [];
@@ -117,12 +213,13 @@ let broadcastRequests = [];
 let pendingRequests = [];
 let availableRooms = [];
 let obCourses = [];       // onboarding: courses the user picked to tutor
+let obTuteeCourses = []; // onboarding: courses the user needs help with
 let currentReqTab = 'direct';
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
   const savedMode = localStorage.getItem('pl_mode') || 'tutee';
-  const savedView = localStorage.getItem('pl_view') || 'dashboard';
+  const savedView = window.__onboarding ? 'dashboard' : (localStorage.getItem('pl_view') || 'dashboard');
   setMode(savedMode);
   switchView(savedView);
 
@@ -180,6 +277,78 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.__onboarding) {
     initOnboarding();
   }
+
+  // ── Tutee: Broadcast Request button ──
+  document.getElementById('broadcastRequestBtn')?.addEventListener('click', () => openBroadcastModal());
+
+  // ── Profile section: explicit listeners replacing onclick attributes ──
+  document.getElementById('editProfileBtn')?.addEventListener('click', () => toggleEditMode(true));
+  document.getElementById('cancelProfileEditBtn')?.addEventListener('click', () => toggleEditMode(false));
+  document.getElementById('profileEditMode')?.addEventListener('submit', e => saveProfile(e));
+  document.getElementById('tutorSelect')?.addEventListener('change', () => addProfileCourse('tutor'));
+  document.getElementById('tuteeSelect')?.addEventListener('change', () => addProfileCourse('tutee'));
+  document.getElementById('photoInput')?.addEventListener('change', function () { handlePhotoSelect(this); });
+  document.getElementById('editPersonalInfoBtn')?.addEventListener('click', () => togglePersonalEdit(true));
+  document.getElementById('cancelPersonalEditBtn')?.addEventListener('click', () => togglePersonalEdit(false));
+  document.getElementById('savePersonalInfoBtn')?.addEventListener('click', () => savePersonalInfo());
+  document.getElementById('pwChangeTrigger')?.addEventListener('click', () => togglePasswordChange(true));
+  document.getElementById('cancelPasswordBtn')?.addEventListener('click', () => togglePasswordChange(false));
+  document.getElementById('updatePasswordBtn')?.addEventListener('click', () => changePassword());
+  document.getElementById('deleteAccountBtn')?.addEventListener('click', () => openDeleteModal());
+
+  // ── Complete Session modal ──
+  document.getElementById('completeSessionOverlay')?.addEventListener('click', closeCompleteSessionModal);
+  document.getElementById('completeSessionModal')?.addEventListener('click', e => e.stopPropagation());
+  document.getElementById('closeCompleteBtn')?.addEventListener('click', closeCompleteSessionModal);
+  document.getElementById('confirmCompleteBtn')?.addEventListener('click', submitCompleteSession);
+
+  // ── Profile course tag removal ──
+  document.getElementById('profileEditMode')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="remove-profile-tag"]');
+    if (!btn) return;
+    removeProfileTag(btn.dataset.course, btn.dataset.type);
+  });
+
+  // ── Tutor: Requests Modal (direct requests list) ──
+  document.getElementById('requestsList')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id } = btn.dataset;
+    if (action === 'req-accept')  respondTutorRequest(id, 'accept');
+    else if (action === 'req-counter') openCounterModal(id);
+    else if (action === 'req-decline') respondTutorRequest(id, 'decline');
+  });
+
+  // ── Tutor: Broadcast pool list ──
+  document.getElementById('broadcastList')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="claim-broadcast"]');
+    if (!btn) return;
+    claimBroadcast(btn.dataset.id);
+  });
+
+  // ── My Sessions list: delegated listener ──
+  document.getElementById('mySessionsList')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id, sessionId, tutorId, tutorName } = btn.dataset;
+    if (action === 'complete')            completeSession(id);
+    else if (action === 'cancel-session') cancelSession(id);
+    else if (action === 'review')         openReviewModal(sessionId, tutorId, tutorName);
+  });
+
+  // ── My Requests list: delegated listener ──
+  document.getElementById('myRequestsList')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id, sessionId, tutorId, tutorName } = btn.dataset;
+    if (action === 'accept-incoming')       openAcceptFromMyRequests(id);
+    else if (action === 'counter-propose')  openCounterModal(id);
+    else if (action === 'decline-incoming') declineIncomingRequest(id);
+    else if (action === 'counter-accept')   respondToCounter(id, 'student_accept');
+    else if (action === 'counter-decline')  respondToCounter(id, 'student_decline');
+    else if (action === 'cancel-request')   cancelRequest(id);
+    else if (action === 'review')           openReviewModal(sessionId, tutorId, tutorName);
+  });
 });
 
 // ===== NAVIGATION =====
@@ -237,15 +406,14 @@ function setMode(mode) {
     badge.style.background = 'var(--coral)';
   }
   if (currentView === 'myRequests') renderMyRequests();
+  else updateReqBadge();
 }
 
 // ===== PROFILE =====
+// Uses cachedJson so a reload paints from localStorage instantly, then
+// updates the UI when fresh data arrives (only if it actually changed).
 async function fetchProfile() {
-  try {
-    const res = await fetch('/api/profile', { cache: 'no-store' });
-    if (!res.ok) return;
-    const data = await res.json();
-
+  await cachedJson('profile', '/api/profile', 300, (data) => {
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
     userProfile.tuteeCourses = data.tuteeCourses || [];
@@ -255,16 +423,19 @@ async function fetchProfile() {
     populateGroupRoomSelect();
     populateAcceptRoomSelect();
 
-    document.getElementById('statSessions').textContent = data.upcomingSessions ?? '—';
-    document.getElementById('statRating').textContent   = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
-    document.getElementById('statCourses').textContent  = data.coursesCount ?? '—';
+    const sSess = document.getElementById('statSessions');
+    if (sSess) sSess.textContent = data.upcomingSessions ?? '—';
+    const sRate = document.getElementById('statRating');
+    if (sRate) sRate.textContent = data.ratingAvg > 0 ? data.ratingAvg.toFixed(1) : '—';
+    const sCour = document.getElementById('statCourses');
+    if (sCour) sCour.textContent = data.coursesCount ?? '—';
 
     if (data.photoUrl) displayAvatar(data.photoUrl);
     if (data.programCode) { const el = document.getElementById('displayProgram'); if (el) el.textContent = data.programCode; }
     if (data.yearLevel)   { const el = document.getElementById('displayYearLevel'); if (el) el.textContent = data.yearLevel; }
     const contactEl = document.getElementById('displayContact');
     if (contactEl) contactEl.textContent = data.contactNumber || '—';
-  } catch {}
+  });
 }
 
 function toggleEditMode(isEdit) {
@@ -290,7 +461,7 @@ function renderProfileTags(type) {
   const container = document.getElementById(`${type}Tags`);
   const list = type === 'tutor' ? userProfile.tutorCourses : userProfile.tuteeCourses;
   container.innerHTML = list.map(c => `
-    <span class="filter-tag">${esc(c)}<button type="button" onclick="removeProfileTag('${esc(c)}','${type}')">✕</button></span>
+    <span class="filter-tag">${esc(c)}<button type="button" data-action="remove-profile-tag" data-course="${esc(c)}" data-type="${type}">✕</button></span>
   `).join('');
 }
 
@@ -304,25 +475,17 @@ async function saveProfile(event) {
   event.preventDefault();
   userProfile.bio = document.getElementById('bioInput').value;
 
-  try {
-    const res = await fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ 
-          bio: userProfile.bio, 
-          tutorCourses: userProfile.tutorCourses,
-          tuteeCourses: userProfile.tuteeCourses
-      }),
-    });
-    if (!res.ok) throw new Error();
+  const res = await apiPatch('/api/profile', {
+    bio: userProfile.bio,
+    tutorCourses: userProfile.tutorCourses,
+    tuteeCourses: userProfile.tuteeCourses,
+  });
+  if (!res) return;
 
-    showToast('Profile saved!');
-    fetchProfile();
-  } catch {
-    showToast('Failed to save profile.');
-    return;
-  }
-
+  // Tutor course list changed → tutor directory may have changed too
+  cache.invalidate('profile', 'tutors');
+  showToast('Profile saved!');
+  fetchProfile();
   toggleEditMode(false);
 }
 
@@ -403,17 +566,12 @@ function renderFilterTags() {
 }
 
 async function fetchTutors() {
-  try {
-    const res = await fetch('/api/tutors');
-    if (!res.ok) throw new Error();
-    const data = await res.json();
+  await cachedJson('tutors', '/api/tutors', 300, (data) => {
     allTutors = data.tutors || [];
+    allUniqueCourses = new Set();
     allTutors.forEach(t => (t.courses || []).forEach(c => allUniqueCourses.add(c)));
     filterTutors();
-  } catch {
-    allTutors = [];
-    filterTutors();
-  }
+  });
 }
 
 function filterTutors() {
@@ -487,6 +645,38 @@ function closeSessionModal() {
   if (list) list.innerHTML = '';
 }
 
+// ===== TUTEE BROADCAST REQUEST =====
+// Reuses the existing session modal but with no preselected tutor and the
+// FULL course catalog populated. submitRequest() already handles
+// `selectedTutor === null` by sending tutor_id: null to the API → the
+// request lands in the broadcast pool where any tutor can claim it.
+function openBroadcastModal() {
+  selectedTutor = null;
+
+  document.getElementById('modalName').textContent = 'Broadcast a Request';
+  document.getElementById('modalSub').textContent  = 'Any available tutor can claim this';
+  // Broadcast has no specific tutor — leave the avatar empty rather than using
+  // a placeholder emoji. The styled circle still renders, just blank.
+  document.getElementById('modalAvatar').textContent = '';
+
+  // Populate course dropdown with ALL courses (not just one tutor's expertise).
+  const allCourses = window.__courses || [];
+  const sel = document.getElementById('sessionCourse');
+  sel.innerHTML = '<option value="" disabled selected>Select a course</option>' +
+    allCourses.map(c => `<option value="${esc(c.code)}">${esc(c.code)} — ${esc(c.name)}</option>`).join('');
+
+  // Reset other fields
+  document.getElementById('sessionTopic').innerHTML = '<option value="" disabled selected>Select a course first</option>';
+  document.getElementById('sessionDate').value = '';
+  document.getElementById('sessionMessage').value = '';
+  const wrap = document.getElementById('sessionTopicsWrap');
+  if (wrap) wrap.style.display = 'none';
+  const tlist = document.getElementById('sessionTopicsList');
+  if (tlist) tlist.innerHTML = '';
+
+  document.getElementById('sessionModalOverlay').classList.add('open');
+}
+
 function updateSessionTopics() {
     const courseCode = document.getElementById('sessionCourse').value;
     const topicSelect = document.getElementById('sessionTopic');
@@ -527,8 +717,14 @@ async function submitRequest() {
     preferred_date: date,
   });
   if (!res) return;
+  // Invalidate every list that could now contain this new request.
+  // - student's "My Requests" view (always)
+  // - broadcast pool       (if no tutor was selected → tutor_id null)
+  // - target tutor's pending list (if direct request)
+  cache.invalidate('myRequests:student', 'myRequests:tutor', 'notifications');
+  if (!tutorId) cache.invalidate('broadcastPool');
   closeSessionModal();
-  showToast(`Request sent to ${tutorName}!`);
+  showToast(tutorId ? `Request sent to ${tutorName}!` : 'Broadcast posted — any tutor can claim it.');
   fetchMyRequests();
   fetchNotifications();
 }
@@ -557,18 +753,11 @@ function switchReqTab(tab) {
 }
 
 async function fetchTutorRequests() {
-  try {
-    const res = await fetch('/api/requests?role=tutor', {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json' },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+  // Short TTL (30s) — tutor needs to see new student requests quickly.
+  await cachedJson('tutorRequests', '/api/requests?role=tutor', 30, (data) => {
     pendingRequests = data.requests || [];
-  } catch {
-    // keep existing data so buttons in open modal remain functional
-  }
-  renderTutorRequests();
+    renderTutorRequests();
+  });
 }
 
 function renderTutorRequests() {
@@ -589,9 +778,9 @@ function renderTutorRequests() {
       <div class="request-date">🗓 ${dateStr}</div>
       ${req.message ? `<div class="request-msg">"${esc(req.message)}"</div>` : ''}
       <div class="request-actions">
-        <button class="btn-accept"  onclick="respondTutorRequest('${esc(req.id)}','accept')">Accept</button>
-        <button class="btn-outline" onclick="openCounterModal('${esc(req.id)}')">Propose Changes</button>
-        <button class="btn-decline" onclick="respondTutorRequest('${esc(req.id)}','decline')">Decline</button>
+        <button class="btn-accept"  data-action="req-accept"  data-id="${esc(req.id)}">Accept</button>
+        <button class="btn-outline" data-action="req-counter" data-id="${esc(req.id)}">Propose Changes</button>
+        <button class="btn-decline" data-action="req-decline" data-id="${esc(req.id)}">Decline</button>
       </div>
     </div>`;
   }).join('');
@@ -607,9 +796,12 @@ async function respondTutorRequest(id, action) {
   const doRequest = async () => {
     const res = await apiPatch(`/api/requests/${id}`, { action });
     if (!res) return;
-    pendingRequests = pendingRequests.filter(r => r.id !== id);
+    cache.invalidate('tutorRequests', 'myRequests:student', 'myRequests:tutor', 'notifications');
+    pendingRequests      = pendingRequests.filter(r => r.id !== id);
+    myIncomingRequests   = myIncomingRequests.filter(r => r.id !== id);
     renderTutorRequests();
     showToast('Request declined.');
+    fetchMyRequests();
     fetchNotifications();
     if (!pendingRequests.length) setTimeout(closeRequestsModal, 1500);
   };
@@ -628,15 +820,10 @@ async function respondTutorRequest(id, action) {
 
 // ===== BROADCAST POOL =====
 async function fetchBroadcastRequests() {
-  try {
-    const res = await fetch('/api/requests?role=broadcast');
-    if (!res.ok) throw new Error();
-    const data = await res.json();
+  await cachedJson('broadcastPool', '/api/requests?role=broadcast', 30, (data) => {
     broadcastRequests = data.requests || [];
-  } catch {
-    broadcastRequests = [];
-  }
-  renderBroadcastRequests();
+    renderBroadcastRequests();
+  });
 }
 
 function renderBroadcastRequests() {
@@ -657,7 +844,7 @@ function renderBroadcastRequests() {
       <div class="request-date">🗓 ${dateStr}</div>
       ${req.message ? `<div class="request-msg">"${esc(req.message)}"</div>` : ''}
       <div class="request-actions">
-        <button class="btn-accept" onclick="claimBroadcast('${esc(req.id)}')">Claim &amp; Accept</button>
+        <button class="btn-accept" data-action="claim-broadcast" data-id="${esc(req.id)}">Claim &amp; Accept</button>
       </div>
     </div>`;
   }).join('');
@@ -701,6 +888,7 @@ async function submitCounterProposal() {
 
   const res = await apiPatch(`/api/requests/${requestId}`, { action: 'counter_propose', counter_time: time, counter_message: message, counter_modality: modality });
   if (!res) return;
+  cache.invalidate('tutorRequests', 'myRequests:student', 'myRequests:tutor', 'notifications');
   closeCounterModal();
   pendingRequests = pendingRequests.filter(r => r.id !== requestId);
   renderTutorRequests();
@@ -759,6 +947,7 @@ async function submitGroupSession() {
     message,
   });
   if (!res) return;
+  cache.invalidate('profile', 'sessions', 'openSessions', 'notifications');
   closeGroupSessionModal();
   showToast('Group session posted!');
   fetchProfile();
@@ -769,19 +958,44 @@ async function submitGroupSession() {
 // ===== MY REQUESTS VIEW (US_10 + US_11 student + US_16) =====
 async function fetchMyRequests() {
   const list = document.getElementById('myRequestsList');
-  if (list) list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">Loading…</p>';
+
+  // 1) Hydrate from cache instantly so the user sees something within ~16ms.
+  const cachedStudent = cache.get('myRequests:student');
+  const cachedTutor   = cache.get('myRequests:tutor');
+  if (cachedStudent) myRequestsData     = cachedStudent.data.requests || [];
+  if (cachedTutor)   myIncomingRequests = cachedTutor.data.requests   || [];
+  if (cachedStudent || cachedTutor) {
+    try { renderMyRequests(); } catch {}
+  } else if (list) {
+    list.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem 0;">Loading…</p>';
+  }
+
+  // 2) Always refetch in the background so writes from another tab show up
+  //    quickly. Skip the network only when both caches are still fresh.
+  if (cachedStudent?.fresh && cachedTutor?.fresh) return;
+
   const jsonHeaders = { 'Accept': 'application/json' };
   try {
     const [sRes, tRes] = await Promise.all([
       fetch('/api/requests?role=student', { cache: 'no-store', headers: jsonHeaders }),
       fetch('/api/requests?role=tutor',   { cache: 'no-store', headers: jsonHeaders }),
     ]);
-    if (sRes.ok) myRequestsData     = (await sRes.json()).requests || [];
-    if (tRes.ok) myIncomingRequests = (await tRes.json()).requests || [];
+    if (sRes.ok) {
+      const sData = await sRes.json();
+      myRequestsData = sData.requests || [];
+      cache.set('myRequests:student', sData, 60);
+    }
+    if (tRes.ok) {
+      const tData = await tRes.json();
+      myIncomingRequests = tData.requests || [];
+      cache.set('myRequests:tutor', tData, 60);
+    }
     if (!sRes.ok || !tRes.ok) throw new Error(`HTTP ${!sRes.ok ? sRes.status : tRes.status}`);
   } catch (err) {
     console.error('fetchMyRequests failed:', err);
-    if (list) list.innerHTML = `<p style="text-align:center;color:var(--coral);padding:2rem 0;">Failed to load requests (${err.message}). Try refreshing.</p>`;
+    if (!cachedStudent && !cachedTutor && list) {
+      list.innerHTML = `<p style="text-align:center;color:var(--coral);padding:2rem 0;">Failed to load requests (${err.message}). Try refreshing.</p>`;
+    }
     return;
   }
   try {
@@ -796,6 +1010,7 @@ async function respondToCounter(requestId, action) {
   const doRequest = async () => {
     const res = await apiPatch(`/api/requests/${requestId}`, { action });
     if (!res) return;
+    cache.invalidate('myRequests:student', 'myRequests:tutor', 'sessions', 'notifications');
     showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
     fetchMyRequests();
     fetchNotifications();
@@ -839,6 +1054,8 @@ async function submitReview() {
 
   const res = await apiPost('/api/reviews', { session_id: sessionId, reviewee_id: tutorId, rating, feedback });
   if (!res) return;
+  // Review changes the tutor's rating_avg → tutor directory + my requests both stale.
+  cache.invalidate('myRequests:student', 'myRequests:tutor', 'sessions', 'tutors');
   closeReviewModal();
   showToast('Review submitted!');
   fetchMyRequests();
@@ -847,13 +1064,12 @@ async function submitReview() {
 
 // ===== US_15: NOTIFICATIONS =====
 async function fetchNotifications() {
-  try {
-    const res = await fetch('/api/notifications', { cache: 'no-store' });
-    if (!res.ok) return;
-    const data = await res.json();
+  // Notifications are polled every 60s anyway, so a 30s cache just smooths
+  // out reloads — the next poll will replace the data either way.
+  await cachedJson('notifications', '/api/notifications', 30, (data) => {
     lastFetchedNotifs = data.notifications || [];
     renderNotifications(lastFetchedNotifs, data.unread_count || 0);
-  } catch { /* silently ignore poll failures */ }
+  });
 }
 
 function renderNotifications(notifications, unreadCount) {
@@ -890,29 +1106,35 @@ function toggleNotifDropdown() {
   notifDropdownOpen = !notifDropdownOpen;
   document.getElementById('notifDropdown').classList.toggle('open', notifDropdownOpen);
   if (notifDropdownOpen) {
-    // Fetch first so the user sees the notifications, then silently mark as read
-    fetchNotifications().then(() => {
+    // Fetch first so the user sees the notifications, then mark as read
+    fetchNotifications().then(async () => {
       if (lastFetchedNotifs.length > 0) {
         lastFetchedNotifs.forEach(n => dismissedNotifIds.add(n.id));
+        // Persist dismissed IDs so they survive page reloads
+        try {
+          const arr = [...dismissedNotifIds].slice(-300);
+          dismissedNotifIds = new Set(arr);
+          localStorage.setItem('pl_seenNotifs', JSON.stringify(arr));
+        } catch {}
         document.getElementById('notifBadge').style.display = 'none';
-        const token = getCsrfToken();
-        if (token) fetch('/api/notifications/read', {
-          method: 'PATCH', keepalive: true,
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
-          body: '{}',
-        });
+        await apiPatch('/api/notifications/read', {});
       }
     });
   }
 }
 
 async function markAllNotificationsRead() {
-  // Record every currently-fetched ID so renderNotifications filters them out on future polls
   lastFetchedNotifs.forEach(n => dismissedNotifIds.add(n.id));
+  try {
+    const arr = [...dismissedNotifIds].slice(-300);
+    dismissedNotifIds = new Set(arr);
+    localStorage.setItem('pl_seenNotifs', JSON.stringify(arr));
+  } catch {}
   document.getElementById('notifBadge').style.display = 'none';
   const list = document.getElementById('notifList');
   if (list) list.innerHTML = '<p class="notif-empty">No new notifications.</p>';
   await apiPatch('/api/notifications/read', {});
+  cache.invalidate('notifications');
 }
 
 function notifNavigate(view) {
@@ -928,9 +1150,13 @@ function initOnboarding() {
   const overlay = document.getElementById('onboardingOverlay');
   overlay.style.display = 'flex';
 
-  // Populate course select from window.__courses
-  const sel = document.getElementById('obCourseSelect');
-  if (sel && window.__courses) {
+  obCourses      = [];
+  obTuteeCourses = [];
+
+  // Populate both course selects from window.__courses
+  function populateSel(id) {
+    const sel = document.getElementById(id);
+    if (!sel || !window.__courses) return;
     window.__courses.forEach(c => {
       const opt = document.createElement('option');
       opt.value       = c.code;
@@ -938,6 +1164,8 @@ function initOnboarding() {
       sel.appendChild(opt);
     });
   }
+  populateSel('obCourseSelect');
+  populateSel('obTuteeCourseSelect');
 
   obStep = 1;
   showObStep(1);
@@ -977,6 +1205,31 @@ function renderObTags() {
   `).join('');
 }
 
+function obAddTuteeCourse() {
+  const sel = document.getElementById('obTuteeCourseSelect');
+  const val = sel.value;
+  if (val && !obTuteeCourses.includes(val)) {
+    obTuteeCourses.push(val);
+    renderObTuteeTags();
+  }
+  sel.selectedIndex = 0;
+}
+
+function obRemoveTuteeCourse(code) {
+  obTuteeCourses = obTuteeCourses.filter(c => c !== code);
+  renderObTuteeTags();
+}
+
+function renderObTuteeTags() {
+  const container = document.getElementById('obTuteeTags');
+  if (!container) return;
+  container.innerHTML = obTuteeCourses.map(c => `
+    <span class="filter-tag" style="background:var(--coral);">${esc(c)}
+      <button type="button" onclick="obRemoveTuteeCourse('${esc(c)}')">✕</button>
+    </span>
+  `).join('');
+}
+
 async function obFinish() {
   // Check if the user selected at least one course
   if (obCourses.length === 0) {
@@ -989,19 +1242,17 @@ async function obFinish() {
   btn.textContent = 'Saving…';
 
   // Save courses via real API (US_07) — obCourses is guaranteed non-empty from guard above
-  try {
-    await fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ tutorCourses: obCourses }),
-    });
+  const saveRes = await apiPatch('/api/profile', { tutorCourses: obCourses, tuteeCourses: obTuteeCourses });
+  if (saveRes) {
     userProfile.tutorCourses = [...obCourses];
+    userProfile.tuteeCourses = [...obTuteeCourses];
     updateProfileDisplay();
     fetchProfile();
-  } catch { /* non-blocking */ }
+  }
 
   document.getElementById('onboardingOverlay').style.display = 'none';
-  showToast('Welcome to PeerLink!');
+  switchView('dashboard');
+  showToast('Welcome to PeerLink! Your courses have been saved.');
 }
 
 
@@ -1025,15 +1276,11 @@ async function handlePhotoSelect(input) {
   reader.onload = async e => {
     const dataUrl = e.target.result;
     displayAvatar(dataUrl);
-    try {
-      const res = await fetch('/api/user/photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-        body: JSON.stringify({ photo: dataUrl }),
-      });
-      if (!res.ok) throw new Error();
+    const res = await apiPost('/api/user/photo', { photo: dataUrl });
+    if (res) {
+      cache.invalidate('profile');
       showToast('Photo updated!');
-    } catch { showToast('Failed to upload photo.'); }
+    }
   };
   reader.readAsDataURL(file);
 }
@@ -1051,7 +1298,7 @@ function loadPersonalInfo() {
 
 function togglePersonalEdit(show) {
   document.getElementById('personalEditForm').style.display = show ? 'block' : 'none';
-  const trigger = document.querySelector('[onclick="togglePersonalEdit(true)"]');
+  const trigger = document.getElementById('editPersonalInfoBtn');
   if (trigger) trigger.style.display = show ? 'none' : 'inline-flex';
   if (show) {
     const u = window.__authUser || {};
@@ -1071,24 +1318,20 @@ async function savePersonalInfo() {
 
   if (!programCode || !yearLevel) { showToast('Please fill in all required fields.'); return; }
 
-  try {
-    const res = await fetch('/api/user/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ program_code: programCode, current_year_level: yearLevel, contact_number: contactNumber || null }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      showToast(err.message || 'Update failed.');
-      return;
-    }
-    window.__authUser = { ...(window.__authUser || {}), programCode, yearLevel, contact: contactNumber };
-    document.getElementById('displayProgram').textContent   = programCode;
-    document.getElementById('displayYearLevel').textContent = yearLevel;
-    document.getElementById('displayContact').textContent   = contactNumber || '—';
-    togglePersonalEdit(false);
-    showToast('Personal info updated!');
-  } catch { showToast('Failed to update personal info.'); }
+  const res = await apiPatch('/api/user/profile', {
+    program_code: programCode,
+    current_year_level: yearLevel,
+    contact_number: contactNumber || null,
+  });
+  if (!res) return;
+
+  cache.invalidate('profile');
+  window.__authUser = { ...(window.__authUser || {}), programCode, yearLevel, contact: contactNumber };
+  document.getElementById('displayProgram').textContent   = programCode;
+  document.getElementById('displayYearLevel').textContent = yearLevel;
+  document.getElementById('displayContact').textContent   = contactNumber || '—';
+  togglePersonalEdit(false);
+  showToast('Personal info updated!');
 }
 
 // ===== PASSWORD CHANGE =====
@@ -1112,20 +1355,15 @@ async function changePassword() {
   if (newPw !== confirm) { showToast('New passwords do not match.'); return; }
   if (newPw.length < 8)  { showToast('Password must be at least 8 characters.'); return; }
 
-  try {
-    const res = await fetch('/api/user/password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
-      body: JSON.stringify({ current_password: current, password: newPw, password_confirmation: confirm }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      showToast(err.error || 'Failed to change password.');
-      return;
-    }
-    togglePasswordChange(false);
-    showToast('Password changed successfully!');
-  } catch { showToast('Failed to change password.'); }
+  const res = await apiPost('/api/user/password', {
+    current_password: current,
+    password: newPw,
+    password_confirmation: confirm,
+  });
+  if (!res) return;
+
+  togglePasswordChange(false);
+  showToast('Password changed successfully!');
 }
 
 // ===== PHASE 1.1: ACCEPT MODAL =====
@@ -1192,6 +1430,13 @@ async function submitAccept() {
     meeting_link:   meetingLink,
   });
   if (!res) return;
+  // Accepting/claiming creates a new session row + flips request status →
+  // every list above can change. Invalidate them all so the next paint is fresh.
+  cache.invalidate(
+    'profile', 'sessions', 'openSessions',
+    'tutorRequests', 'broadcastPool',
+    'myRequests:student', 'myRequests:tutor', 'notifications'
+  );
   closeAcceptModal();
   if (isClaim) {
     broadcastRequests = broadcastRequests.filter(r => r.id !== requestId);
@@ -1205,6 +1450,7 @@ async function submitAccept() {
   }
   fetchProfile();
   fetchMyRequests();
+  fetchSessions();
   fetchNotifications();
 }
 
@@ -1213,13 +1459,10 @@ async function submitAccept() {
 let mySessions = [];
 
 async function fetchSessions() {
-  try {
-    const res = await fetch('/api/sessions', { cache: 'no-store' });
-    if (!res.ok) throw new Error();
-    const data = await res.json();
+  await cachedJson('sessions', '/api/sessions', 60, (data) => {
     mySessions = data.sessions || [];
-  } catch { mySessions = []; }
-  renderSessions();
+    renderSessions();
+  });
 }
 
 function renderSessions() {
@@ -1248,15 +1491,15 @@ function renderSessions() {
     if (s.myRole === 'Tutor' && s.status === 'Scheduled') {
       actionsHtml = `
         <div class="request-actions" style="margin-top:.75rem;">
-          <button class="btn-accept"  onclick="completeSession('${esc(s.session_id)}')">Mark Complete</button>
-          <button class="btn-decline" onclick="cancelSession('${esc(s.session_id)}')">Cancel Session</button>
+          <button class="btn-accept"  data-action="complete"      data-id="${esc(s.session_id)}">Mark Complete</button>
+          <button class="btn-decline" data-action="cancel-session" data-id="${esc(s.session_id)}">Cancel Session</button>
         </div>`;
     }
     if (s.canReview) {
       actionsHtml += `
         <div style="margin-top:.5rem;">
           <button class="btn-outline" style="font-size:.85rem;padding:.4rem .9rem;"
-            onclick="openReviewModal('${esc(s.session_id)}','${esc(s.tutorId)}','${esc(s.partnerName)}')">★ Leave Review</button>
+            data-action="review" data-session-id="${esc(s.session_id)}" data-tutor-id="${esc(s.tutorId)}" data-tutor-name="${esc(s.partnerName)}">★ Leave Review</button>
         </div>`;
     }
 
@@ -1285,22 +1528,34 @@ function renderSessions() {
   }).join('');
 }
 
-async function completeSession(id) {
-  showConfirmModal(
-    'Mark as Completed',
-    'Confirm this session is done? Students will be prompted to leave a review.',
-    async () => {
-      const res = await apiPatch(`/api/sessions/${id}`, { action: 'complete' });
-      if (!res) return;
-      showToast('Session marked as completed!');
-      const filterEl = document.getElementById('sessionsFilter');
-      if (filterEl) filterEl.value = 'all';
-      fetchSessions();
-      fetchProfile();
-      fetchNotifications();
-    },
-    { icon: '✅', confirmLabel: 'Mark Complete', cancelLabel: 'Not Yet', destructive: false }
-  );
+function completeSession(id) {
+  const session = mySessions.find(s => s.session_id === id);
+  if (session && session.scheduledTime && new Date(session.scheduledTime) > new Date()) {
+    showToast('Sessions can only be marked complete after their scheduled start time.');
+    return;
+  }
+  document.getElementById('completeSessionId').value = id;
+  document.getElementById('completeSummary').value   = '';
+  document.getElementById('completeSessionOverlay').classList.add('open');
+}
+
+function closeCompleteSessionModal() {
+  document.getElementById('completeSessionOverlay').classList.remove('open');
+}
+
+async function submitCompleteSession() {
+  const id      = document.getElementById('completeSessionId').value;
+  const summary = document.getElementById('completeSummary').value.trim();
+  const res = await apiPatch(`/api/sessions/${id}`, { action: 'complete', summary: summary || null });
+  if (!res) return;
+  cache.invalidate('sessions', 'profile', 'notifications', 'myRequests:student', 'myRequests:tutor');
+  closeCompleteSessionModal();
+  showToast('Session marked as completed!');
+  const filterEl = document.getElementById('sessionsFilter');
+  if (filterEl) filterEl.value = 'all';
+  fetchSessions();
+  fetchProfile();
+  fetchNotifications();
 }
 
 async function cancelSession(id) {
@@ -1310,10 +1565,12 @@ async function cancelSession(id) {
     async () => {
       const res = await apiPatch(`/api/sessions/${id}`, { action: 'cancel' });
       if (!res) return;
+      cache.invalidate('sessions', 'openSessions', 'profile', 'notifications', 'myRequests:student', 'myRequests:tutor');
       showToast('Session cancelled.');
       const filterElCancel = document.getElementById('sessionsFilter');
       if (filterElCancel) filterElCancel.value = 'all';
       fetchSessions();
+      fetchProfile();
       fetchNotifications();
     },
     { icon: '🚫', confirmLabel: 'Yes, Cancel Session', cancelLabel: 'Keep it', destructive: true }
@@ -1324,13 +1581,10 @@ async function cancelSession(id) {
 let openSessions = [];
 
 async function fetchOpenSessions() {
-  try {
-    const res = await fetch('/api/sessions/open', { cache: 'no-store' });
-    if (!res.ok) throw new Error();
-    const data = await res.json();
+  await cachedJson('openSessions', '/api/sessions/open', 60, (data) => {
     openSessions = data.sessions || [];
-  } catch { openSessions = []; }
-  renderOpenSessions();
+    renderOpenSessions();
+  });
 }
 
 function renderOpenSessions() {
@@ -1368,6 +1622,7 @@ function renderOpenSessions() {
 async function joinSession(id) {
   const res = await apiPost(`/api/sessions/${id}/join`, {});
   if (!res) return;
+  cache.invalidate('openSessions', 'sessions', 'notifications');
   showToast('You have joined the session!');
   fetchOpenSessions();
   fetchSessions();
@@ -1381,6 +1636,7 @@ async function declineIncomingRequest(id) {
     async () => {
       const res = await apiPatch(`/api/requests/${id}`, { action: 'decline' });
       if (!res) return;
+      cache.invalidate('tutorRequests', 'myRequests:student', 'myRequests:tutor', 'notifications');
       myIncomingRequests = myIncomingRequests.filter(r => r.id !== id);
       renderMyRequests();
       showToast('Request declined.');
@@ -1397,8 +1653,15 @@ async function cancelRequest(id) {
     async () => {
       const res = await apiPatch(`/api/requests/${id}`, { action: 'cancel' });
       if (!res) return;
+      cache.invalidate('myRequests:student', 'myRequests:tutor', 'broadcastPool', 'tutorRequests', 'notifications');
       showToast('Request cancelled.');
-      fetchMyRequests();
+      // Optimistically update the badge right away so the user sees "Cancelled"
+      const req = myRequestsData.find(r => r.id === id);
+      if (req) req.status = 'Cancelled';
+      const filterEl = document.getElementById('myRequestsFilter');
+      if (filterEl) filterEl.value = 'all';   // switch to All so the cancelled card stays visible
+      renderMyRequests();                       // instant re-render with grey badge
+      fetchMyRequests();                        // then sync fresh data from server
       fetchNotifications();
     },
     { confirmLabel: 'Yes, Cancel', cancelLabel: 'Keep it', destructive: true }
@@ -1411,8 +1674,23 @@ function openAcceptFromMyRequests(id) {
   openAcceptModal(req);
 }
 
+function updateReqBadge() {
+  const badge = document.getElementById('reqBadge');
+  if (!badge) return;
+  const count = currentMode === 'tutor'
+    ? myIncomingRequests.length
+    : myRequestsData.filter(r => r.status === 'Pending' || r.status === 'CounterProposed').length;
+  if (count > 0) {
+    badge.textContent   = count > 9 ? '9+' : count;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
 // Mode-aware: tutor toggle → incoming requests, tutee toggle → sent requests
 function renderMyRequests() {
+  updateReqBadge();
   const list      = document.getElementById('myRequestsList');
   const filterRow = document.querySelector('#myRequestsView .filter-row');
 
@@ -1438,9 +1716,9 @@ function renderMyRequests() {
             ${msg ? `<div class="request-msg" style="margin-top:.5rem;">"${esc(msg)}"</div>` : ''}
             <div class="request-date" style="margin-top:.25rem;">Received: ${dateStr}</div>
             <div class="request-actions" style="margin-top:.75rem;">
-              <button class="btn-accept"  onclick="openAcceptFromMyRequests('${esc(req.id)}')">Accept</button>
-              <button class="btn-outline" onclick="openCounterModal('${esc(req.id)}')">Propose Changes</button>
-              <button class="btn-decline" onclick="declineIncomingRequest('${esc(req.id)}')">Decline</button>
+              <button class="btn-accept"  data-action="accept-incoming"  data-id="${esc(req.id)}">Accept</button>
+              <button class="btn-outline" data-action="counter-propose"  data-id="${esc(req.id)}">Propose Changes</button>
+              <button class="btn-decline" data-action="decline-incoming" data-id="${esc(req.id)}">Decline</button>
             </div>
           </div>`;
       }).join('')}`;
@@ -1485,8 +1763,8 @@ function renderMyRequests() {
             <div>🗓 ${cpDate}${cp.modality ? ' &nbsp;|&nbsp; ' + esc(cp.modality) : ''}${cp.room ? ' @ ' + esc(cp.room) : ''}</div>
             ${cp.message ? `<div style="font-style:italic;margin-top:.25rem;">"${esc(cp.message)}"</div>` : ''}
             <div class="request-actions" style="margin-top:.75rem;">
-              <button class="btn-accept"  onclick="respondToCounter('${esc(req.id)}','student_accept')">Accept</button>
-              <button class="btn-decline" onclick="respondToCounter('${esc(req.id)}','student_decline')">Decline</button>
+              <button class="btn-accept"  data-action="counter-accept"  data-id="${esc(req.id)}">Accept</button>
+              <button class="btn-decline" data-action="counter-decline" data-id="${esc(req.id)}">Decline</button>
             </div>
           </div>`;
       }
@@ -1503,7 +1781,7 @@ function renderMyRequests() {
             ${!req.session.hasReview && req.tutorId
               ? `<button class="btn-outline"
                   style="margin-left:.5rem;padding:.3rem .8rem;font-size:.8rem;"
-                  onclick="openReviewModal('${esc(req.session.session_id)}','${esc(req.tutorId)}','${esc(req.tutorName)}')">
+                  data-action="review" data-session-id="${esc(req.session.session_id)}" data-tutor-id="${esc(req.tutorId)}" data-tutor-name="${esc(req.tutorName)}">
                   ★ Leave Review
                 </button>`
               : ''}
@@ -1514,7 +1792,7 @@ function renderMyRequests() {
       const cancelBtn = (req.status === 'Pending' || req.status === 'CounterProposed')
         ? `<div style="margin-top:.5rem;">
              <button class="btn-outline" style="font-size:.8rem;padding:.3rem .7rem;color:var(--coral);border-color:var(--coral);"
-               onclick="cancelRequest('${esc(req.id)}')">Cancel Request</button>
+               data-action="cancel-request" data-id="${esc(req.id)}">Cancel Request</button>
            </div>`
         : '';
 
@@ -1603,11 +1881,21 @@ async function loadSessionTopics() {
     const data = await res.json();
     const topics = data.topics || [];
     if (!topics.length) { wrap.style.display = 'none'; return; }
+    // Use semantic classes (.topic-chip) — styling lives in dashboard.css.
+    // The .checked class is toggled below so the chip turns purple when picked,
+    // giving the user clear visual feedback at a glance.
     listEl.innerHTML = topics.map(t => `
-      <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.82rem;background:white;padding:.25rem .6rem;border-radius:20px;border:1px solid #d0c8b8;">
-        <input type="checkbox" value="${esc(t.topic_name)}" style="accent-color:var(--purple);">
-        ${esc(t.topic_name)}
+      <label class="topic-chip">
+        <input type="checkbox" value="${esc(t.topic_name)}">
+        <span>${esc(t.topic_name)}</span>
       </label>`).join('');
+    // Single delegated change-listener flips the .checked class on whichever
+    // chip the user clicks. Cleaner than wiring N individual onchange handlers.
+    listEl.onchange = (e) => {
+      if (e.target.matches('input[type="checkbox"]')) {
+        e.target.closest('.topic-chip')?.classList.toggle('checked', e.target.checked);
+      }
+    };
     wrap.style.display = 'block';
   } catch {
     wrap.style.display = 'none';
@@ -1628,6 +1916,7 @@ document.addEventListener('keydown', function (e) {
     ['acceptModalOverlay',     closeAcceptModal],
     ['tutorProfileOverlay',    closeTutorProfile],
     ['deleteModal',            closeDeleteModal],
+    ['completeSessionOverlay', closeCompleteSessionModal],
   ];
   for (const [id, fn] of modalMap) {
     const el = document.getElementById(id);
@@ -1637,4 +1926,70 @@ document.addEventListener('keydown', function (e) {
     notifDropdownOpen = false;
     document.getElementById('notifDropdown').classList.remove('open');
   }
+});
+
+// ===== GLOBAL EXPORTS =====
+// Explicitly assigns every function called by an onclick="" attribute in any
+// Blade template to window, so they work whether this file is loaded as a
+// classic <script> or compiled as a Vite ES module in the future.
+Object.assign(window, {
+  // Navigation & layout
+  switchView, setMode,
+
+  // Explore Tutors
+  filterTutors, toggleCourseDropdown, addFilterCourse, removeFilterCourse, handleCourseInput,
+
+  // Notifications
+  toggleNotifDropdown, markAllNotificationsRead, notifNavigate,
+
+  // Session request modal
+  closeSessionModal, loadSessionTopics, submitRequest,
+
+  // Tutor: Requests modal
+  openRequestsModal, closeRequestsModal, switchReqTab,
+  respondTutorRequest,
+  openCounterModal, closeCounterModal, submitCounterProposal,
+  openAcceptFromMyRequests, closeAcceptModal, toggleAcceptLink, submitAccept,
+  claimBroadcast,
+
+  // Tutor: Group session
+  openGroupSessionModal, closeGroupSessionModal, toggleGroupLink, submitGroupSession,
+
+  // Session lifecycle (Task 5)
+  completeSession, closeCompleteSessionModal, submitCompleteSession, cancelSession,
+
+  // Open group sessions (tutee)
+  joinSession,
+
+  // Reviews
+  openReviewModal, closeReviewModal, submitReview,
+
+  // My Requests
+  cancelRequest, respondToCounter, declineIncomingRequest,
+
+  // Tutor profile detail
+  openTutorProfile, closeTutorProfile,
+
+  // Onboarding
+  obNext, obPrev, obFinish,
+  obAddCourse, obRemoveCourse,
+  obAddTuteeCourse, obRemoveTuteeCourse,
+
+  // Profile edit
+  toggleEditMode, saveProfile, addProfileCourse, removeProfileTag, handlePhotoSelect,
+  togglePersonalEdit, savePersonalInfo,
+  togglePasswordChange, changePassword,
+
+  // Delete account
+  openDeleteModal, closeDeleteModal, prepareDeleteSubmit,
+
+  // Confirm modal
+  closeConfirmModal, _executeConfirm,
+
+  // Cache (exposed for the logout form's onsubmit hook in dashboard.blade.php
+  // and as a debugging aid: open DevTools and run `cache.clearAll()` to reset)
+  cache,
+
+  // Tutee broadcast modal opener
+  openBroadcastModal,
 });

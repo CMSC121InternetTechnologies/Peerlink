@@ -12,7 +12,7 @@ class TutoringSession extends Model
     protected $keyType = 'string';
     public const UPDATED_AT = null;
 
-    protected $fillable = ['request_id', 'modality', 'room_id', 'meeting_link', 'scheduled_time', 'status'];
+    protected $fillable = ['request_id', 'modality', 'room_id', 'meeting_link', 'scheduled_time', 'status', 'summary'];
 
     protected static function boot()
     {
