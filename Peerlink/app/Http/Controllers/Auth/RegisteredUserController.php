@@ -17,7 +17,12 @@ class RegisteredUserController extends Controller
 {
     public function create(): View
     {
-        $programs = \App\Models\Program::orderBy('program_code')->get();
+        $programs = \App\Models\Program::join('Divisions', 'Programs.division_id', '=', 'Divisions.division_id')
+            ->select('Programs.*', 'Divisions.division_name')
+            ->orderBy('Divisions.division_name')
+            ->orderBy('Programs.program_name')
+            ->get()
+            ->groupBy('division_name');
         return view('auth.register', compact('programs'));
     }
 

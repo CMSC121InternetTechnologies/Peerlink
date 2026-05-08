@@ -33,12 +33,16 @@
             </div>
 
             <label>Degree Program</label>
-            <select name="program_code" required style="width: 100%; padding: 0.6rem; border: 1.5px solid #e0d8c8; border-radius: 8px; margin-bottom: 0.5rem; font-family: 'DM Sans';">
+            <select name="program_code" required>
                 <option value="" disabled selected>Select Program</option>
-                @foreach($programs as $program)
-                    <option value="{{ $program->program_code }}" {{ old('program_code') == $program->program_code ? 'selected' : '' }}>
-                        {{ $program->program_name }}
-                    </option>
+                @foreach($programs as $divisionName => $divPrograms)
+                    <optgroup label="{{ $divisionName }}">
+                        @foreach($divPrograms as $program)
+                            <option value="{{ $program->program_code }}" {{ old('program_code') == $program->program_code ? 'selected' : '' }}>
+                                {{ $program->program_name }}
+                            </option>
+                        @endforeach
+                    </optgroup>
                 @endforeach
             </select>
 

@@ -172,7 +172,8 @@ class SessionController extends Controller
         $session = TutoringSession::findOrFail($id);
 
         $validated = $request->validate([
-            'action' => ['required', Rule::in(['complete', 'cancel'])],
+            'action'  => ['required', Rule::in(['complete', 'cancel'])],
+            'summary' => ['nullable', 'string', 'max:500'],
         ]);
 
         // Only the tutor of the session may update its status
@@ -191,7 +192,12 @@ class SessionController extends Controller
                 return response()->json(['error' => 'Only scheduled sessions can be completed.'], 422);
             }
 
-            $session->status = 'Completed';
+            if (now() < \Carbon\Carbon::parse($session->scheduled_time)) {
+                return response()->json(['error' => 'Sessions can only be marked complete after their scheduled start time.'], 422);
+            }
+
+            $session->status  = 'Completed';
+            $session->summary = $validated['summary'] ?? null;
             $session->save();
 
             // Mark all participants as attended

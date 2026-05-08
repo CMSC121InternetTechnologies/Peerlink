@@ -35,7 +35,13 @@ class TutorController extends Controller
             ];
         });
 
-        return response()->json(['tutors' => $formattedTutors]);
+        // Cache-Control: tells the BROWSER it may re-use this response for up to
+        // 60 seconds without re-hitting the server. The frontend's localStorage
+        // cache covers the same window, but this gives us a second line of defense
+        // for the back/forward cache and for browsers that ignore the JS cache
+        // (e.g. when the user opens the dashboard in a new tab).
+        return response()->json(['tutors' => $formattedTutors])
+            ->header('Cache-Control', 'private, max-age=60');
     }
 
     // GET /api/tutors/{id}
