@@ -419,7 +419,7 @@ async function fetchProfile() {
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
     userProfile.tuteeCourses = data.tuteeCourses || [];
-    availableRooms           = data.rooms || [];
+    availableRooms           = Array.isArray(data.rooms) ? data.rooms : Object.values(data.rooms || {});
 
     updateProfileDisplay();
     populateGroupRoomSelect();
@@ -1375,6 +1375,8 @@ let _acceptIsClaim = false;  // true when opened from claimBroadcast
 function populateAcceptRoomSelect() {
   const sel = document.getElementById('acceptRoom');
   if (!sel) return;
+
+  const modality = document.getElementById('acceptModality').value;
 
   const targetType = modality === 'Online' ? 'Virtual' : 'Physical';
   const filteredRooms = availableRooms.filter(r => r.room_type === targetType);
