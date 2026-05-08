@@ -2,7 +2,8 @@
 to start coding on the project clone the repository then navigate to:
 
 ## Prerequisites: 
-* php
+* php ver. 8.4 or newer
+* MySQL ver. 8.0.13 or newer
 * laravel 
 * composer
 
