@@ -151,14 +151,42 @@ const cache = {
   // Wipe every cache key for this user — call on logout.
   clearAll() {
     try {
-      const prefix = _cacheKey('');
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+        if (k && k.startsWith(CACHE_PREFIX)) {
+          localStorage.removeItem(k);
+        }
       }
     } catch {}
   },
 };
+
+window.addEventListener('pageshow', function (event) {
+    // If the page was restored from the browser's in-memory cache
+    if (event.persisted) {
+        // Force a hard reload from the server. 
+        // The server will see they are logged out and redirect to /login.
+        window.location.reload(); 
+    }
+});
+
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        // Check if our cache prefix exists anywhere in localStorage
+        let isLoggedOut = true;
+        for (let i = 0; i < localStorage.length; i++) {
+            if (localStorage.key(i).startsWith('pl_cache_')) {
+                isLoggedOut = false;
+                break;
+            }
+        }
+        
+        // If the cache is empty but we are on a protected page, force a reload
+        if (isLoggedOut) {
+            window.location.reload();
+        }
+    }
+});
 
 // Stale-while-revalidate JSON fetcher.
 //   onData(data) is called twice when there is stale cache:
