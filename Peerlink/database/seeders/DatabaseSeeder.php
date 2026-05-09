@@ -30,19 +30,20 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('Programs')->insertOrIgnore([
-            // Division of Humanities
+            // Division of Humanities (DH)
             ['program_code' => 'BALit',    'division_id' => 'DH',   'program_name' => 'BA Literature'],
             ['program_code' => 'BAMedia',  'division_id' => 'DH',   'program_name' => 'BA Media Arts'],
-            // Division of Management
+            // Division of Management (DM)
             ['program_code' => 'BSAcc',    'division_id' => 'DM',   'program_name' => 'BS Accountancy'],
             ['program_code' => 'BSMgt',    'division_id' => 'DM',   'program_name' => 'BS Management'],
             ['program_code' => 'MM',       'division_id' => 'DM',   'program_name' => 'Master of Management'],
-            // Division of Natural Sciences and Mathematics
+            // Division of Natural Sciences and Mathematics (DNSM)
             ['program_code' => 'BSAMath',  'division_id' => 'DNSM', 'program_name' => 'BS Applied Mathematics'],
             ['program_code' => 'BSBio',    'division_id' => 'DNSM', 'program_name' => 'BS Biology'],
             ['program_code' => 'BSCS',     'division_id' => 'DNSM', 'program_name' => 'BS Computer Science'],
             ['program_code' => 'MSEnvSci', 'division_id' => 'DNSM', 'program_name' => 'MS Environmental Science'],
-            // Division of Social Sciences
+            // Division of Social Sciences (DSS)
+            ['program_code' => 'BAPolSci', 'division_id' => 'DSS',  'program_name' => 'BA Political Science'],
             ['program_code' => 'BAPsych',  'division_id' => 'DSS',  'program_name' => 'BA Psychology'],
             ['program_code' => 'BSEcon',   'division_id' => 'DSS',  'program_name' => 'BS Economics'],
         ]);
