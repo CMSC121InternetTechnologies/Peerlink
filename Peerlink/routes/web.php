@@ -14,20 +14,41 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
 
-Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+/*
+ |--------------------------------------------------------------------------
+ | Authenticated HTML routes
+ |--------------------------------------------------------------------------
+ | Every page behind login uses BOTH 'auth' and 'no-cache':
+ |
+ |   - 'auth'      → redirect to /login if the session is gone
+ |   - 'no-cache'  → send Cache-Control: no-store so pressing Back after
+ |                   logout doesn't show the cached dashboard. Without this
+ |                   the browser's BFCache happily renders a screen that
+ |                   already leaked the user's data to whoever has the laptop.
+ |
+ | See app/Http/Middleware/PreventBackHistory.php for the header values.
+ */
+Route::middleware(['auth', 'no-cache'])->group(function (): void {
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('verified')
+        ->name('dashboard');
 
-Route::middleware('auth')->group(function (): void {
-    Route::middleware(['auth', 'no-cache'])->group(function () {
     Route::get('/profile',    [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile',  [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
-});
 
-// Protected API routes (session-based auth, 60 req/min per user).
-Route::middleware(['auth', 'throttle:60,1'])->prefix('api')->group(function (): void {
+/*
+ |--------------------------------------------------------------------------
+ | Protected API routes (session-based auth, 60 req/min per user)
+ |--------------------------------------------------------------------------
+ | API responses are JSON, not HTML, so the BFCache concern is different —
+ | but stale JSON in cache is just as confusing for the SPA. 'no-cache' is
+ | applied here too so any GET that surfaces user data is always fresh.
+ | (Endpoints that explicitly want caching, like /api/tutors, override
+ | with their own Cache-Control header in the controller.)
+ */
+Route::middleware(['auth', 'no-cache', 'throttle:60,1'])->prefix('api')->group(function (): void {
     Route::get('/tutors', [TutorController::class, 'index']);
 
     Route::get('/profile',   [ApiProfileController::class, 'show']);

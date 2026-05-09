@@ -11,7 +11,19 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('guest')->group(function () {
+/*
+ | The 'guest' middleware (RedirectIfAuthenticated) bounces any logged-in
+ | visitor back to /dashboard automatically — that's how Laravel handles
+ | "if I'm logged in and I hit Back, don't show me /login again".
+ |
+ | But that only works if the browser actually MAKES the request. Without
+ | 'no-cache', Chrome's BFCache happily renders a stored snapshot of the
+ | login page when the user clicks Back, never asking the server, so the
+ | guest middleware never runs. Applying 'no-cache' here forces every
+ | navigation to /login to revalidate against the server, which then runs
+ | the guest middleware and sends authenticated users to /dashboard.
+ */
+Route::middleware(['guest', 'no-cache'])->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
@@ -62,5 +74,4 @@ Route::middleware('auth')->group(function () {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
-    
 });
