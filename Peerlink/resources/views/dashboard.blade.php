@@ -10,7 +10,13 @@
   {{-- @vite() injects <link> tags for every CSS file and a <script> for app.js.
        The old asset('style.css') hard-link was removed to avoid loading the
        stylesheet twice (once from public/ and once through the Vite pipeline). --}}
-  @vite(['resources/css/style.css', 'resources/css/dashboard.css', 'resources/css/register.css', 'resources/js/app.js'])
+  @vite([
+    'resources/css/style.css',
+    'resources/css/dashboard.css',
+    'resources/css/register.css',
+    'resources/js/app.js',       //{{-- Alpine + CSS bootstrap --}}
+    'resources/js/dashboard.js', //{{-- The dashboard SPA — was public/app.js --}}
+  ])
 </head>
 <body class="mode-tutee">
 
@@ -236,13 +242,24 @@
         <div class="profile-header-main">
           <div class="profile-avatar-wrap">
             <div class="tutor-avatar larger" id="profileAvatar">{{ substr(auth()->user()?->first_name ?? '?', 0, 1) }}{{ substr(auth()->user()?->last_name ?? '?', 0, 1) }}</div>
-            <label class="avatar-upload-label" title="Change photo">
+            <!-- Camera icon = upload/replace. Clicking it opens the file picker. -->
+            <label class="avatar-upload-label" title="Change photo" id="photoChangeBtn">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
               <input type="file" accept="image/*" id="photoInput" style="display:none;">
             </label>
+            <!-- Trash icon = remove the existing photo. Hidden until a photo is set
+                 (toggled by app.js via .has-photo on the wrap). -->
+            <button type="button" class="avatar-remove-btn" id="photoRemoveBtn"
+                    title="Remove photo" aria-label="Remove profile photo">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+              </svg>
+            </button>
           </div>
           <div class="profile-meta">
             <h1 id="profileDisplayName">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</h1>
@@ -278,7 +295,7 @@
             <div id="personalEditForm" style="display:none;margin-top:1rem;">
               <div class="course-edit-grid" style="margin-bottom:.75rem;">
                 <div class="input-group">
-                  <label>Program</label>
+                  <label for="programSelect">Program</label>
                   <select id="programSelect" class="select-course">
                     <option value="">— select —</option>
                     @foreach($programs as $p)
@@ -287,12 +304,12 @@
                   </select>
                 </div>
                 <div class="input-group">
-                  <label>Year Level</label>
+                  <label for="yearLevelInput">Year Level</label>
                   <input type="number" id="yearLevelInput" min="1" max="10" class="select-course" style="padding:.6rem .75rem;"/>
                 </div>
               </div>
               <div class="input-group" style="margin-bottom:.75rem;">
-                <label>Contact Number</label>
+                <label for="contactInput">Contact Number</label>
                 <input type="text" id="contactInput" placeholder="e.g. 09171234567" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
               </div>
               <div style="display:flex;gap:.75rem;">
@@ -307,15 +324,15 @@
             <button class="btn-outline" id="pwChangeTrigger" style="font-size:.85rem;padding:.4rem .9rem;">Change Password</button>
             <div id="passwordChangeForm" style="display:none;margin-top:1rem;">
               <div class="input-group" style="margin-bottom:.75rem;">
-                <label>Current Password</label>
+                <label for="currentPassword">Current Password</label>
                 <input type="password" id="currentPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
               </div>
               <div class="input-group" style="margin-bottom:.75rem;">
-                <label>New Password</label>
+                <label for="newPassword">New Password</label>
                 <input type="password" id="newPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
               </div>
               <div class="input-group" style="margin-bottom:.75rem;">
-                <label>Confirm New Password</label>
+                <label for="confirmPassword">Confirm New Password</label>
                 <input type="password" id="confirmPassword" style="width:100%;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;font-family:inherit;font-size:.9rem;"/>
               </div>
               <div style="display:flex;gap:.75rem;">
@@ -336,7 +353,7 @@
         <form id="profileEditMode" style="display:none;">
           <div class="edit-layout">
             <div class="input-group">
-              <label>Bio</label>
+              <label for="bioInput">Bio</label>
               <div class="bio-textarea-wrapper">
                 <textarea id="bioInput" maxlength="250"></textarea>
                 <div class="char-counter"><span id="charCount">0</span>/250</div>
@@ -344,7 +361,7 @@
             </div>
             <div class="course-edit-grid">
               <div class="input-group">
-                <label>Expertise (Tutor)</label>
+                <label for="tutorSelect">Expertise (Tutor)</label>
                 <select class="select-course" id="tutorSelect">
                   <option value="" disabled selected>+ Add Course</option>
                   @foreach($courses as $course)
@@ -354,7 +371,7 @@
                 <div id="tutorTags" class="edit-tags-container"></div>
               </div>
               <div class="input-group">
-                <label>Learning Goals (Tutee)</label>
+                <label for="tuteeSelect">Learning Goals (Tutee)</label>
                 <select class="select-course" id="tuteeSelect">
                   <option value="" disabled selected>+ Add Course</option>
                   @foreach($courses as $course)
@@ -374,348 +391,26 @@
     </div>
   </main>
 
-<!--SESSION REQUEST-->
-  <div class="modal-overlay" id="sessionModalOverlay" onclick="closeSessionModal()">
-    <div class="modal modal-lg" id = "sessionModalContainer" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeSessionModal()">✕</button>
-      <div class="modal-avatar" id="modalAvatar"></div>
-      <h2 class="modal-name" id="modalName"></h2>
-      <p class="modal-sub"  id="modalSub"></p>
-
-      <div class="modal-form" >
-        <label>Course</label>
-        <select id="sessionCourse" class="select-course" style="margin-bottom:.75rem;" onchange="loadSessionTopics()">
-          <option value="" disabled selected>Select a course</option>
-        </select>
-        <div id="sessionTopicsWrap" class="topic-picker" style="display:none;">
-          <div class="topic-picker-header">
-            <span class="topic-picker-label">Topics</span>
-            <span class="topic-picker-hint">Optional · pick anything you want help with</span>
-          </div>
-          <div id="sessionTopicsList" class="topic-picker-grid"></div>
-        </div>
-        <label>Additional Notes</label>
-        <input type="text" placeholder="e.g. Pointers in C, Recursion…" id="sessionTopic"/>
-        <label>Preferred Schedule</label>
-        <input type="datetime-local" id="sessionDate"/>
-        <label>Message (optional)</label>
-        <textarea placeholder="Any notes for the tutor…" id="sessionMessage"></textarea>
-        <button class="btn-primary full-width" onclick="submitRequest()" style="margin-top:1rem;">Send Request</button>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== DELETE ACCOUNT MODAL ===== -->
-  <div class="modal-overlay" id="deleteModal">
-    <div class="modal">
-      <button class="modal-close" onclick="closeDeleteModal()">✕</button>
-      <h2 style="margin-bottom:1rem;color:var(--coral);">Delete Account</h2>
-      <p style="margin-bottom:1rem;color:var(--text-muted);">Confirm with your password to permanently delete your account.</p>
-      <input type="password" id="deleteConfirmPassword" class="modal-input"
-             placeholder="Password"
-             style="width:100%;padding:.8rem;border-radius:var(--radius-sm);border:1px solid #e0d8c8;margin-bottom:1.5rem;font-family:inherit;"/>
-      <p id="deleteError" style="color:var(--coral);font-size:.85rem;margin-bottom:.75rem;display:none;"></p>
-      <!-- Hidden form that does the real DELETE /profile submit -->
-      <form id="deleteAccountForm" method="POST" action="/profile">
-        @csrf
-        @method('DELETE')
-        <input type="hidden" name="password" id="deletePasswordHidden"/>
-        <button type="submit" class="btn-primary full-width" style="background:var(--coral);"
-                onclick="return prepareDeleteSubmit()">Delete Permanently</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===== TUTOR: REQUESTS MODAL (direct + broadcast tabs) ===== -->
-  <div class="modal-overlay" id="requestsModalOverlay" onclick="closeRequestsModal()">
-    <div class="modal modal-lg" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeRequestsModal()">✕</button>
-      <h2 class="page-title" style="margin-bottom:1rem;font-size:1.5rem;">Session Requests</h2>
-      <!-- Tabs -->
-      <div class="req-tabs">
-        <button class="req-tab active" id="tabDirect"    onclick="switchReqTab('direct')">Direct Requests</button>
-        <button class="req-tab"        id="tabBroadcast" onclick="switchReqTab('broadcast')">Broadcasts</button>
-      </div>
-      <div id="requestsList"  class="requests-list"></div>
-      <div id="broadcastList" class="requests-list" style="display:none;"></div>
-    </div>
-  </div>
-
-  <!-- ===== COUNTER-PROPOSAL MODAL (US_11 tutor) ===== -->
-  <div class="modal-overlay" id="counterModalOverlay" onclick="closeCounterModal()">
-    <div class="modal" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeCounterModal()">✕</button>
-      <h2 style="margin-bottom:1rem;">Propose New Schedule</h2>
-      <input type="hidden" id="counterRequestId"/>
-      <div class="modal-form">
-        <label>Proposed Date &amp; Time</label>
-        <input type="datetime-local" id="counterTime"/>
-        <label>Modality</label>
-        <select id="counterModality" class="select-course" style="margin-bottom:.75rem;">
-          <option value="In-Person">In-Person</option>
-          <option value="Online">Online</option>
-        </select>
-        <label>Message to Student (optional)</label>
-        <textarea id="counterMessage" placeholder="Explain the change…"></textarea>
-        <button class="btn-primary full-width" onclick="submitCounterProposal()" style="margin-top:1rem;">Send Proposal</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== GROUP SESSION MODAL (US_13 tutor) ===== -->
-  <div class="modal-overlay" id="groupSessionModalOverlay" onclick="closeGroupSessionModal()">
-    <div class="modal" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeGroupSessionModal()">✕</button>
-      <h2 style="margin-bottom:1rem;">Post Group Study Session</h2>
-      <div class="modal-form">
-        <label>Course</label>
-        <select id="groupCourse" class="select-course" style="margin-bottom:.75rem;">
-          <option value="" disabled selected>Select a course</option>
-          @foreach($courses as $course)
-            <option value="{{ $course->course_code }}">{{ $course->course_code }} — {{ $course->course_name }}</option>
-          @endforeach
-        </select>
-        <label>Date &amp; Time</label>
-        <input type="datetime-local" id="groupTime"/>
-        <label>Modality</label>
-        <select id="groupModality" class="select-course" style="margin-bottom:.75rem;" onchange="toggleGroupLink()">
-          <option value="In-Person">In-Person</option>
-          <option value="Online">Online</option>
-        </select>
-        <div id="groupRoomWrap">
-          <label>Room</label>
-          <select id="groupRoom" class="select-course" style="margin-bottom:.75rem;">
-            <option value="">— auto-assign —</option>
-          </select>
-        </div>
-        <div id="groupLinkWrap" style="display:none;">
-          <label>Meeting Link</label>
-          <input type="url" id="groupLink" placeholder="https://meet.google.com/…"/>
-        </div>
-        <label>Message (optional)</label>
-        <textarea id="groupMessage" placeholder="What topics will you cover?"></textarea>
-        <button class="btn-primary full-width" onclick="submitGroupSession()" style="margin-top:1rem;">Post Session</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== REVIEW MODAL (US_16 student) ===== -->
-  <div class="modal-overlay" id="reviewModalOverlay" onclick="closeReviewModal()">
-    <div class="modal" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeReviewModal()">✕</button>
-      <h2 style="margin-bottom:.5rem;">Leave a Review</h2>
-      <p id="reviewTutorName" style="color:var(--text-muted);margin-bottom:1rem;"></p>
-      <input type="hidden" id="reviewSessionId"/>
-      <input type="hidden" id="reviewTutorId"/>
-      <div class="modal-form">
-        <label>Rating</label>
-        <div class="star-rating" id="starRating">
-          <span class="star-btn" data-val="1">★</span>
-          <span class="star-btn" data-val="2">★</span>
-          <span class="star-btn" data-val="3">★</span>
-          <span class="star-btn" data-val="4">★</span>
-          <span class="star-btn" data-val="5">★</span>
-        </div>
-        <input type="hidden" id="reviewRating" value="0"/>
-        <label style="margin-top:.75rem;">Feedback (optional)</label>
-        <textarea id="reviewFeedback" placeholder="Share your experience…"></textarea>
-        <button class="btn-primary full-width" onclick="submitReview()" style="margin-top:1rem;">Submit Review</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== ONBOARDING MODAL (US_06 + US_07) ===== -->
-  <div class="modal-overlay open" id="onboardingOverlay" style="display:none;">
-    <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:560px;">
-
-      <!-- Step 1: Welcome -->
-      <div class="ob-step" id="obStep1">
-        <div style="font-size:2.5rem;margin-bottom:.75rem;">👋</div>
-        <h2 style="margin-bottom:.5rem;">Welcome to PeerLink!</h2>
-        <p style="color:var(--text-muted);margin-bottom:1.5rem;line-height:1.6;">
-          PeerLink connects students who need help with peers who can tutor them.
-          Let's take a quick tour of the core flow before you dive in.
-        </p>
-        <button class="btn-primary full-width" onclick="obNext()">Start Tutorial →</button>
-      </div>
-
-      <!-- Step 2: Find a Tutor (mock) -->
-      <div class="ob-step" id="obStep2" style="display:none;">
-        <h2 style="margin-bottom:.25rem;">Step 1 — Find a Tutor</h2>
-        <p style="color:var(--text-muted);margin-bottom:1rem;font-size:.9rem;">
-          In <strong>Explore Tutors</strong>, you can filter by course code or search by name.
-          Each card shows the tutor's courses and rating.
-        </p>
-        <div class="tutors-grid" style="pointer-events:none;opacity:.85;margin-bottom:1.25rem;">
-          <div class="tutor-card">
-            <div class="tutor-card-header">
-              <div class="tutor-avatar">AS</div>
-              <div class="tutor-info">
-                <div class="tutor-name">Alex Santos</div>
-                <div class="tutor-degree">BSCS 3</div>
-                <div class="tutor-rating"><span class="star">★</span> 4.8 <span>(12 reviews)</span></div>
-              </div>
-            </div>
-            <div class="tutor-courses">
-              <span class="course-badge">CMSC121</span>
-              <span class="course-badge">CMSC122</span>
-            </div>
-            <button class="btn-primary full-width" style="background:var(--purple);">Request session</button>
-          </div>
-          <div class="tutor-card">
-            <div class="tutor-card-header">
-              <div class="tutor-avatar">MC</div>
-              <div class="tutor-info">
-                <div class="tutor-name">Maria Cruz</div>
-                <div class="tutor-degree">BSCS 4</div>
-                <div class="tutor-rating"><span class="star">★</span> 4.9 <span>(8 reviews)</span></div>
-              </div>
-            </div>
-            <div class="tutor-courses">
-              <span class="course-badge">MATH18</span>
-              <span class="course-badge">STAT105</span>
-            </div>
-            <button class="btn-primary full-width" style="background:var(--purple);">Request session</button>
-          </div>
-        </div>
-        <div style="display:flex;gap:.75rem;">
-          <button class="btn-outline" onclick="obPrev()">← Back</button>
-          <button class="btn-primary" style="flex:1;" onclick="obNext()">Next →</button>
-        </div>
-      </div>
-
-      <!-- Step 3: Request a Session (mock) -->
-      <div class="ob-step" id="obStep3" style="display:none;">
-        <h2 style="margin-bottom:.25rem;">Step 2 — Request a Session</h2>
-        <p style="color:var(--text-muted);margin-bottom:1rem;font-size:.9rem;">
-          Click <strong>Request session</strong> on any tutor card. Fill in the course,
-          topic, preferred schedule, and an optional message.
-          The tutor can accept, decline, or propose a different time.
-        </p>
-        <div style="background:var(--cream-dark);border-radius:var(--radius);padding:1rem;margin-bottom:1.25rem;pointer-events:none;opacity:.85;">
-          <div style="font-weight:600;margin-bottom:.75rem;">📋 Sample Request Form</div>
-          <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.875rem;">
-            <div><span style="color:var(--text-muted);">Course:</span> <span class="course-badge">CMSC121</span></div>
-            <div><span style="color:var(--text-muted);">Topic:</span> Laravel Routing &amp; Controllers</div>
-            <div><span style="color:var(--text-muted);">Schedule:</span> May 10, 2026 · 2:00 PM</div>
-            <div><span style="color:var(--text-muted);">Message:</span> Hi! I'm struggling with middleware. Can we go through it?</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:.75rem;">
-          <button class="btn-outline" onclick="obPrev()">← Back</button>
-          <button class="btn-primary" style="flex:1;" onclick="obNext()">Next →</button>
-        </div>
-      </div>
-
-      <!-- Step 4: Set Up Courses (US_07 — real save) -->
-      <div class="ob-step" id="obStep4" style="display:none;">
-        <h2 style="margin-bottom:.25rem;">Step 3 — Set Up Your Courses</h2>
-        <p style="color:var(--text-muted);margin-bottom:1.25rem;font-size:.9rem;">
-          Tell us which courses you can <strong>tutor</strong> and which you <strong>need help with</strong>.
-        </p>
-        <div class="course-edit-grid" style="margin-bottom:1.25rem;">
-          <div class="input-group">
-            <label style="font-size:.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--teal-dark);">Courses I Can Tutor</label>
-            <select id="obCourseSelect" class="select-course" onchange="obAddCourse()">
-              <option value="" disabled selected>+ Add a course</option>
-            </select>
-            <div id="obCourseTags" class="edit-tags-container" style="min-height:2rem;margin-top:.5rem;"></div>
-          </div>
-          <div class="input-group">
-            <label style="font-size:.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--coral);">Courses I Need Help With</label>
-            <select id="obTuteeCourseSelect" class="select-course" onchange="obAddTuteeCourse()">
-              <option value="" disabled selected>+ Add a course</option>
-            </select>
-            <div id="obTuteeTags" class="edit-tags-container" style="min-height:2rem;margin-top:.5rem;"></div>
-          </div>
-        </div>
-        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem;">ℹ️ At least one tutor course is required to appear in Explore Tutors.</p>
-        <div style="display:flex;gap:.75rem;">
-          <button class="btn-outline" onclick="obPrev()">← Back</button>
-          <button class="btn-primary" style="flex:1;" id="obFinishBtn" onclick="obFinish()">Finish &amp; Go to Dashboard</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ===== ACCEPT SESSION MODAL (Phase 1.1) ===== -->
-  <div class="modal-overlay" id="acceptModalOverlay" onclick="closeAcceptModal()">
-    <div class="modal" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeAcceptModal()">✕</button>
-      <h2 style="margin-bottom:.25rem;">Accept Session</h2>
-      <p id="acceptStudentName" style="color:var(--text-muted);margin-bottom:1rem;font-size:.9rem;"></p>
-      <input type="hidden" id="acceptRequestId"/>
-      <div class="modal-form">
-        <label>Scheduled Date &amp; Time</label>
-        <input type="datetime-local" id="acceptTime"/>
-        <label>Modality</label>
-        <select id="acceptModality" class="select-course" style="margin-bottom:.75rem;" onchange="toggleAcceptLink()">
-          <option value="In-Person">In-Person</option>
-          <option value="Online">Online</option>
-        </select>
-        <div id="acceptRoomWrap">
-          <label>Room</label>
-          <select id="acceptRoom" class="select-course" style="margin-bottom:.75rem;">
-            <option value="">— auto-assign —</option>
-          </select>
-        </div>
-        <div id="acceptLinkWrap" style="display:none;">
-          <label>Meeting Link</label>
-          <input type="url" id="acceptLink" placeholder="https://meet.google.com/…"/>
-        </div>
-        <button class="btn-primary full-width" onclick="submitAccept()" style="margin-top:1rem;">Confirm &amp; Accept</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== TUTOR PROFILE DETAIL MODAL (Phase 3.1) ===== -->
-  <div class="modal-overlay" id="tutorProfileOverlay" onclick="closeTutorProfile()">
-    <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:600px;">
-      <button class="modal-close" onclick="closeTutorProfile()">✕</button>
-      <div id="tutorProfileContent">
-        <div style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== CONFIRMATION MODAL ===== -->
-  <div class="modal-overlay" id="confirmModalOverlay" onclick="closeConfirmModal()">
-    <div class="confirm-modal" onclick="event.stopPropagation()">
-      <div class="confirm-modal-icon" id="confirmIcon"></div>
-      <h2 class="confirm-modal-title" id="confirmTitle"></h2>
-      <p class="confirm-modal-message" id="confirmMessage"></p>
-      <div class="confirm-modal-actions">
-        <button class="btn-outline confirm-btn-cancel" id="confirmCancelBtn" onclick="closeConfirmModal()">Cancel</button>
-        <button class="confirm-btn-ok" id="confirmOkBtn" onclick="_executeConfirm()">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== COMPLETE SESSION MODAL (Task 5) ===== -->
-  <div class="modal-overlay" id="completeSessionOverlay">
-    <div class="modal" id="completeSessionModal">
-      <button class="modal-close" id="closeCompleteBtn">✕</button>
-      <div style="font-size:1.6rem;margin-bottom:.5rem;">✅</div>
-      <h2 style="margin-bottom:.25rem;">Mark Session as Complete</h2>
-      <p style="color:var(--text-muted);margin-bottom:1.25rem;font-size:.9rem;line-height:1.5;">
-        Confirm that this session took place. Students will be prompted to leave a review.
-      </p>
-      <input type="hidden" id="completeSessionId"/>
-      <div class="modal-form">
-        <label>Post-Session Summary <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-        <textarea id="completeSummary" placeholder="Brief notes on topics covered, progress made, or next steps…" style="min-height:90px;"></textarea>
-        <button class="btn-primary full-width" id="confirmCompleteBtn" style="margin-top:1rem;background:#4caf50;">Confirm &amp; Complete</button>
-      </div>
-    </div>
-  </div>
+  {{-- All modals + onboarding extracted to partials/dashboard/modals/ for
+       readability. They depend on shared state set by dashboard.js (the
+       window.__authUser/__courses globals at the top of this file) and
+       function names exposed via Object.assign(window, {...}) at the bottom
+       of dashboard.js. --}}
+  @include('partials.dashboard.modals.session')
+  @include('partials.dashboard.modals.delete-account')
+  @include('partials.dashboard.modals.tutor-requests')
+  @include('partials.dashboard.modals.counter-proposal')
+  @include('partials.dashboard.modals.group-session')
+  @include('partials.dashboard.modals.review')
+  @include('partials.dashboard.modals.onboarding')
+  @include('partials.dashboard.modals.accept-session')
+  @include('partials.dashboard.modals.tutor-profile')
+  @include('partials.dashboard.modals.confirm')
+  @include('partials.dashboard.modals.complete-session')
 
   <!-- Toast -->
   <div id="toast" class="toast"></div>
-  {{-- public/app.js is plain JS (no ES-module imports, no Alpine). It must be
-       loaded as a classic <script defer> AFTER the DOM so its DOMContentLoaded
-       listener fires correctly. @vite handles Alpine separately above. --}}
-  <script defer src="{{ asset('app.js') }}?v={{ filemtime(public_path('app.js')) }}"></script>
+  {{-- Dashboard JS is bundled by Vite — see @vite() in <head>. The old
+       <script defer src="/app.js?v=…"> manual include used to live here. --}}
 </body>
 </html>

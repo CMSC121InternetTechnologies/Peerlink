@@ -1,5 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ * HISTORICAL "BIG-BANG" MIGRATION
+ *
+ * This file creates the entire PeerLink domain schema in one migration.
+ * That violates the Laravel convention of "one table per migration", but
+ * it's frozen here because it has already been applied to production-ish
+ * databases. Splitting it now would require a destructive `migrate:fresh`
+ * which would drop all real data.
+ *
+ * GOING FORWARD: every NEW migration in this project MUST touch a single
+ * concern (one table create, one column add, one index, etc.). The
+ * migrations dated 2026_05_07 onwards already follow this rule — see
+ * `2026_05_08_120000_add_image_path_to_user_photos.php` for an example.
+ *
+ * If you need to refactor this monolith, do it via a separate clean-rebuild
+ * branch + `migrate:fresh --seed`, NOT by editing this file.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +48,7 @@ return new class extends Migration
                     `division_id`   varchar(10) NOT NULL,
                     `division_name` text        NOT NULL,
                     PRIMARY KEY (`division_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -40,7 +62,7 @@ return new class extends Migration
                     PRIMARY KEY (`course_id`),
                     KEY `division_id` (`division_id`),
                     CONSTRAINT `Courses_ibfk_1` FOREIGN KEY (`division_id`) REFERENCES `Divisions` (`division_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -53,7 +75,7 @@ return new class extends Migration
                     PRIMARY KEY (`topic_id`),
                     KEY `course_id` (`course_id`),
                     CONSTRAINT `Course_Topics_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -65,7 +87,7 @@ return new class extends Migration
                     `rating_avg` decimal(3,2)   DEFAULT 0.00,
                     PRIMARY KEY (`user_id`),
                     CONSTRAINT `Tutor_Profiles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -78,7 +100,7 @@ return new class extends Migration
                     KEY `topic_id` (`topic_id`),
                     CONSTRAINT `Tutor_Expertise_ibfk_1` FOREIGN KEY (`user_id`)  REFERENCES `Tutor_Profiles` (`user_id`) ON DELETE CASCADE,
                     CONSTRAINT `Tutor_Expertise_ibfk_2` FOREIGN KEY (`topic_id`) REFERENCES `Course_Topics` (`topic_id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -92,7 +114,7 @@ return new class extends Migration
                     `capacity`  int(11)                   NOT NULL,
                     PRIMARY KEY (`room_id`),
                     UNIQUE KEY `room_code` (`room_code`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -113,7 +135,7 @@ return new class extends Migration
                     CONSTRAINT `Requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `Users`   (`user_id`),
                     CONSTRAINT `Requests_ibfk_2` FOREIGN KEY (`tutor_id`)   REFERENCES `Users`   (`user_id`),
                     CONSTRAINT `Requests_ibfk_3` FOREIGN KEY (`course_id`)  REFERENCES `Courses` (`course_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -133,7 +155,7 @@ return new class extends Migration
                     KEY `room_id` (`room_id`),
                     CONSTRAINT `Sessions_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `Requests` (`request_id`) ON DELETE CASCADE,
                     CONSTRAINT `Sessions_ibfk_2` FOREIGN KEY (`room_id`)    REFERENCES `Rooms`    (`room_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -154,7 +176,7 @@ return new class extends Migration
                     CONSTRAINT `Session_Reviews_ibfk_1` FOREIGN KEY (`session_id`)  REFERENCES `Sessions` (`session_id`),
                     CONSTRAINT `Session_Reviews_ibfk_2` FOREIGN KEY (`reviewer_id`) REFERENCES `Users`    (`user_id`),
                     CONSTRAINT `Session_Reviews_ibfk_3` FOREIGN KEY (`reviewee_id`) REFERENCES `Users`    (`user_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 

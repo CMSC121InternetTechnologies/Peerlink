@@ -59,7 +59,7 @@ return new class extends Migration
                     KEY `Tutee_Courses_ibfk_2` (`course_id`),
                     CONSTRAINT `Tutee_Courses_ibfk_1` FOREIGN KEY (`user_id`)   REFERENCES `Users`   (`user_id`) ON DELETE CASCADE,
                     CONSTRAINT `Tutee_Courses_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `Courses` (`course_id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -78,7 +78,7 @@ return new class extends Migration
                     KEY `user_id`    (`user_id`),
                     CONSTRAINT `SP_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions` (`session_id`) ON DELETE CASCADE,
                     CONSTRAINT `SP_ibfk_2` FOREIGN KEY (`user_id`)    REFERENCES `Users`    (`user_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -92,7 +92,7 @@ return new class extends Migration
                     KEY `topic_id` (`topic_id`),
                     CONSTRAINT `ST_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `Sessions`      (`session_id`) ON DELETE CASCADE,
                     CONSTRAINT `ST_ibfk_2` FOREIGN KEY (`topic_id`)   REFERENCES `Course_Topics` (`topic_id`)   ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         }
 
@@ -106,7 +106,7 @@ return new class extends Migration
                     `uploaded_at` timestamp     NULL DEFAULT current_timestamp(),
                     PRIMARY KEY (`user_id`),
                     CONSTRAINT `UP_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `Users` (`user_id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         } elseif (!Schema::hasColumn('User_Photos', 'mime_type')) {
             // Bug: mime_type column was absent; MIME was hardcoded as image/jpeg on

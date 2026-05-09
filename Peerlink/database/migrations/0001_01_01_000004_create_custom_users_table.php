@@ -14,8 +14,10 @@ return new class extends Migration
         }
 
         if (DB::getDriverName() === 'mysql') {
-            // Use latin1 to match the charset of other tables from the SQL dump
-            // that have FK constraints referencing Users(user_id).
+            // utf8mb4_unicode_ci so names/bios/messages with Filipino tildes,
+            // accented characters, and emoji round-trip correctly. The legacy
+            // SQL dump used latin1; an ALTER TABLE migration converts the live
+            // tables. Fresh installs (migrate:fresh) get utf8mb4 from the start.
             DB::statement("
                 CREATE TABLE `Users` (
                     `user_id`            char(36)     NOT NULL DEFAULT (uuid()),
@@ -31,7 +33,7 @@ return new class extends Migration
                     PRIMARY KEY (`user_id`),
                     UNIQUE KEY `email` (`email`),
                     KEY `fk_users_program` (`program_code`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         } else {
             Schema::create('Users', function (Blueprint $table) {

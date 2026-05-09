@@ -108,6 +108,33 @@ async function apiPost(url, body) {
   return res.json().catch(() => ({}));
 }
 
+// Same shape as apiPatch/apiPost but for DELETE. Used by removePhoto() so
+// far; callable for any future "delete this resource" endpoint.
+async function apiDelete(url) {
+  const token = getCsrfToken();
+  if (!token) { showToast('Session error — please refresh the page (F5).'); return null; }
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'DELETE',
+      headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+    });
+  } catch (e) {
+    console.error('DELETE network error', url, e);
+    showToast('Could not reach the server — make sure it is running.');
+    return null;
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err.error || err.message || `Error ${res.status}`;
+    if (res.status === 419 || res.status === 401) showToast('Session expired — please refresh the page (F5).');
+    else showToast(msg);
+    console.error('DELETE', url, res.status, err);
+    return null;
+  }
+  return res.json().catch(() => ({}));
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
@@ -288,6 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tutorSelect')?.addEventListener('change', () => addProfileCourse('tutor'));
   document.getElementById('tuteeSelect')?.addEventListener('change', () => addProfileCourse('tutee'));
   document.getElementById('photoInput')?.addEventListener('change', function () { handlePhotoSelect(this); });
+  document.getElementById('photoRemoveBtn')?.addEventListener('click', () => removePhoto());
   document.getElementById('editPersonalInfoBtn')?.addEventListener('click', () => togglePersonalEdit(true));
   document.getElementById('cancelPersonalEditBtn')?.addEventListener('click', () => togglePersonalEdit(false));
   document.getElementById('savePersonalInfoBtn')?.addEventListener('click', () => savePersonalInfo());
@@ -794,7 +822,8 @@ async function respondTutorRequest(id, action) {
   }
 
   const doRequest = async () => {
-    const res = await apiPatch(`/api/requests/${id}`, { action });
+    // Each action now has its own URL — no more {action: …} dispatch field.
+    const res = await apiPatch(`/api/requests/${id}/${action}`, {});
     if (!res) return;
     cache.invalidate('tutorRequests', 'myRequests:student', 'myRequests:tutor', 'notifications');
     pendingRequests      = pendingRequests.filter(r => r.id !== id);
@@ -886,7 +915,9 @@ async function submitCounterProposal() {
 
   if (!time) { showToast('Please select a proposed date and time.'); return; }
 
-  const res = await apiPatch(`/api/requests/${requestId}`, { action: 'counter_propose', counter_time: time, counter_message: message, counter_modality: modality });
+  const res = await apiPatch(`/api/requests/${requestId}/counter-propose`, {
+    counter_time: time, counter_message: message, counter_modality: modality,
+  });
   if (!res) return;
   cache.invalidate('tutorRequests', 'myRequests:student', 'myRequests:tutor', 'notifications');
   closeCounterModal();
@@ -1007,8 +1038,11 @@ async function fetchMyRequests() {
 }
 
 async function respondToCounter(requestId, action) {
+  // action arrives as 'student_accept' or 'student_decline' — convert the
+  // underscore to a URL-friendly hyphen for the new split route.
+  const slug = action.replace('_', '-');
   const doRequest = async () => {
-    const res = await apiPatch(`/api/requests/${requestId}`, { action });
+    const res = await apiPatch(`/api/requests/${requestId}/${slug}`, {});
     if (!res) return;
     cache.invalidate('myRequests:student', 'myRequests:tutor', 'sessions', 'notifications');
     showToast(action === 'student_accept' ? 'Session confirmed!' : 'Counter-proposal declined.');
@@ -1257,6 +1291,8 @@ async function obFinish() {
 
 
 // ===== PROFILE PHOTO =====
+// displayAvatar() shows a photo. clearAvatar() reverts to initials.
+// The wrap's .has-photo class drives visibility of the trash button (CSS).
 function displayAvatar(url) {
   const el = document.getElementById('profileAvatar');
   if (!el || !url) return;
@@ -1265,6 +1301,18 @@ function displayAvatar(url) {
   el.style.backgroundPosition = 'center';
   el.style.color = 'transparent';
   el.style.fontSize = '0';
+  el.closest('.profile-avatar-wrap')?.classList.add('has-photo');
+}
+
+function clearAvatar() {
+  const el = document.getElementById('profileAvatar');
+  if (!el) return;
+  el.style.backgroundImage    = '';
+  el.style.backgroundSize     = '';
+  el.style.backgroundPosition = '';
+  el.style.color              = '';
+  el.style.fontSize           = '';
+  el.closest('.profile-avatar-wrap')?.classList.remove('has-photo');
 }
 
 async function handlePhotoSelect(input) {
@@ -1273,16 +1321,39 @@ async function handlePhotoSelect(input) {
   if (file.size > 2 * 1024 * 1024) { showToast('Photo must be under 2MB.'); input.value = ''; return; }
 
   const reader = new FileReader();
-  reader.onload = async e => {
+  reader.onload = async (e) => {
     const dataUrl = e.target.result;
+    // Optimistic update: show the new image immediately. If the server
+    // rejects, the next fetchProfile() will revert to whatever's on disk.
     displayAvatar(dataUrl);
     const res = await apiPost('/api/user/photo', { photo: dataUrl });
     if (res) {
       cache.invalidate('profile');
       showToast('Photo updated!');
+      // Replace the data-URL with the storage URL the server returned so
+      // future renders use the disk path (smaller HTML, no base64 round-trip).
+      if (res.photoUrl) displayAvatar(res.photoUrl);
     }
+    input.value = ''; // clear the file input so picking the same file again still fires `change`
   };
   reader.readAsDataURL(file);
+}
+
+// DELETE /api/user/photo — confirm first because removing a photo isn't
+// something we want to do silently on a misclick.
+function removePhoto() {
+  showConfirmModal(
+    'Remove profile photo?',
+    'Your initials will show until you upload a new photo.',
+    async () => {
+      const res = await apiDelete('/api/user/photo');
+      if (!res) return;
+      cache.invalidate('profile');
+      clearAvatar();
+      showToast('Photo removed.');
+    },
+    { icon: '🗑', confirmLabel: 'Remove', cancelLabel: 'Keep it', destructive: true },
+  );
 }
 
 // ===== PERSONAL INFO =====
@@ -1422,8 +1493,7 @@ async function submitAccept() {
   if (!scheduledTime) { showToast('Please select a date and time.'); return; }
   if (modality === 'Online' && !meetingLink) { showToast('Please provide a meeting link for online sessions.'); return; }
 
-  const res = await apiPatch(`/api/requests/${requestId}`, {
-    action:         isClaim ? 'claim' : 'accept',
+  const res = await apiPatch(`/api/requests/${requestId}/${isClaim ? 'claim' : 'accept'}`, {
     scheduled_time: scheduledTime,
     modality,
     room_id:        roomId ? parseInt(roomId) : null,
@@ -1634,7 +1704,7 @@ async function declineIncomingRequest(id) {
     'Decline Request',
     'Are you sure you want to decline this tutoring request? The student will be notified.',
     async () => {
-      const res = await apiPatch(`/api/requests/${id}`, { action: 'decline' });
+      const res = await apiPatch(`/api/requests/${id}/decline`, {});
       if (!res) return;
       cache.invalidate('tutorRequests', 'myRequests:student', 'myRequests:tutor', 'notifications');
       myIncomingRequests = myIncomingRequests.filter(r => r.id !== id);
@@ -1651,7 +1721,7 @@ async function cancelRequest(id) {
     'Cancel Request',
     'Cancel this request? It will be marked as Cancelled in your history.',
     async () => {
-      const res = await apiPatch(`/api/requests/${id}`, { action: 'cancel' });
+      const res = await apiPatch(`/api/requests/${id}/cancel`, {});
       if (!res) return;
       cache.invalidate('myRequests:student', 'myRequests:tutor', 'broadcastPool', 'tutorRequests', 'notifications');
       showToast('Request cancelled.');
@@ -1942,8 +2012,10 @@ Object.assign(window, {
   // Notifications
   toggleNotifDropdown, markAllNotificationsRead, notifNavigate,
 
-  // Session request modal
-  closeSessionModal, loadSessionTopics, submitRequest,
+  // Session request modal — openSessionModal is called from the inline
+  // onclick="" attribute renderTutors() emits on each tutor card, so it
+  // must be on window even though the function lives in module scope.
+  openSessionModal, closeSessionModal, loadSessionTopics, submitRequest,
 
   // Tutor: Requests modal
   openRequestsModal, closeRequestsModal, switchReqTab,
@@ -1976,7 +2048,7 @@ Object.assign(window, {
   obAddTuteeCourse, obRemoveTuteeCourse,
 
   // Profile edit
-  toggleEditMode, saveProfile, addProfileCourse, removeProfileTag, handlePhotoSelect,
+  toggleEditMode, saveProfile, addProfileCourse, removeProfileTag, handlePhotoSelect, removePhoto,
   togglePersonalEdit, savePersonalInfo,
   togglePasswordChange, changePassword,
 

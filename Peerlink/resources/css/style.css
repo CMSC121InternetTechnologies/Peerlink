@@ -1165,6 +1165,34 @@ body.mode-tutee #tuteeBtn {
   transform: scale(1.08);
 }
 
+/* Trash button — only visible when the wrap has the .has-photo class added by app.js
+   after a photo is loaded. Sits opposite the camera button so the two pair visually. */
+.avatar-remove-btn {
+  position: absolute;
+  bottom: -4px;
+  left: -4px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--coral);
+  color: white;
+  border: 2px solid var(--cream);
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: var(--transition);
+}
+.profile-avatar-wrap.has-photo .avatar-remove-btn { display: flex; }
+.avatar-remove-btn:hover { transform: scale(1.08); filter: brightness(0.95); }
+.avatar-remove-btn:active { transform: scale(0.96); }
+
+/* Slightly more breathing room around the avatar so the two action buttons
+   don't feel cramped against the surrounding profile name/role text. */
+.profile-avatar-wrap { margin-right: 0.25rem; }
+
 /* ===== PERSONAL INFO SECTION ===== */
 .personal-info-list {
   display: flex;

@@ -187,3 +187,83 @@
 .topic-chip.checked input[type="checkbox"] {
     accent-color: white;
 }
+
+/* ==========================================================================
+   SHARED UTILITY CLASSES — replace the inline `style="…"` patterns that
+   used to litter dashboard.blade.php (margins, common font/colour combos,
+   themed button variants). Naming is BEM-like: `mb-md` = margin-bottom: medium.
+   ========================================================================== */
+.mt-xs { margin-top:    0.25rem; }
+.mt-sm { margin-top:    0.5rem;  }
+.mt-md { margin-top:    1rem;    }
+.mt-lg { margin-top:    1.5rem;  }
+.mb-xs { margin-bottom: 0.25rem; }
+.mb-sm { margin-bottom: 0.5rem;  }
+.mb-md { margin-bottom: 1rem;    }
+.mb-lg { margin-bottom: 1.5rem;  }
+
+.muted             { color: var(--text-muted); }
+.label-optional    { color: var(--text-muted); font-weight: 400; }
+.modal-section-title { margin-bottom: 1rem; font-size: 1.5rem; font-weight: 700; }
+.modal-subtle      { color: var(--text-muted); }
+.modal-subtle--small { font-size: 0.9rem; }
+.modal-title-danger { margin-bottom: 1rem; color: var(--coral); }
+.modal-error       { color: var(--coral); font-size: 0.85rem; margin-bottom: 0.75rem; }
+.modal-loading     { text-align: center; padding: 2rem; color: var(--text-muted); }
+.modal-tutor-profile { max-width: 600px; }
+.modal-input--password {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid #e0d8c8;
+    margin-bottom: 1.5rem;
+    font-family: inherit;
+}
+
+/* Themed button variants — one place to change brand colours rather than
+   chasing inline `style="background: #4caf50"` everywhere. */
+.btn-success { background: #4caf50; }
+.btn-danger  { background: var(--coral); }
+.btn-purple  { background: var(--purple); }
+
+/* ==========================================================================
+   ONBOARDING MODAL — sits inside dashboard/modals/onboarding.blade.php.
+   ========================================================================== */
+.ob-modal       { max-width: 560px; }
+.ob-overlay     { /* hook for onboardingOverlay specifically */ }
+.ob-emoji       { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.ob-title       { margin-bottom: 0.5rem; }
+.ob-body        { color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6; }
+.ob-step-title  { margin-bottom: 0.25rem; }
+.ob-step-body   { color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem; }
+.ob-mock        { pointer-events: none; opacity: 0.85; margin-bottom: 1.25rem; }
+.ob-actions     { display: flex; gap: 0.75rem; }
+.ob-action-grow { flex: 1; }
+.ob-hint        { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; }
+.ob-tags        { min-height: 2rem; margin-top: 0.5rem; }
+.ob-course-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.ob-course-label.tutor-color { color: var(--teal-dark); }
+.ob-course-label.tutee-color { color: var(--coral); }
+
+.ob-sample-form {
+    background: var(--cream-dark);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+    pointer-events: none;
+    opacity: 0.85;
+}
+.ob-sample-form-title { font-weight: 600; margin-bottom: 0.75rem; }
+.ob-sample-form-list  { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.875rem; }
+
+/* ==========================================================================
+   COMPLETE-SESSION MODAL specifics
+   ========================================================================== */
+.complete-emoji    { font-size: 1.6rem; margin-bottom: 0.5rem; }
+.complete-subtitle { margin-bottom: 1.25rem; font-size: 0.9rem; line-height: 1.5; }
+.textarea-tall     { min-height: 90px; }
