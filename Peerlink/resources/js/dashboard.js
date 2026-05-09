@@ -178,14 +178,42 @@ const cache = {
   // Wipe every cache key for this user — call on logout.
   clearAll() {
     try {
-      const prefix = _cacheKey('');
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+        if (k && k.startsWith(CACHE_PREFIX)) {
+          localStorage.removeItem(k);
+        }
       }
     } catch {}
   },
 };
+
+window.addEventListener('pageshow', function (event) {
+    // If the page was restored from the browser's in-memory cache
+    if (event.persisted) {
+        // Force a hard reload from the server. 
+        // The server will see they are logged out and redirect to /login.
+        window.location.reload(); 
+    }
+});
+
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        // Check if our cache prefix exists anywhere in localStorage
+        let isLoggedOut = true;
+        for (let i = 0; i < localStorage.length; i++) {
+            if (localStorage.key(i).startsWith('pl_cache_')) {
+                isLoggedOut = false;
+                break;
+            }
+        }
+        
+        // If the cache is empty but we are on a protected page, force a reload
+        if (isLoggedOut) {
+            window.location.reload();
+        }
+    }
+});
 
 // Stale-while-revalidate JSON fetcher.
 //   onData(data) is called twice when there is stale cache:
@@ -250,9 +278,11 @@ document.addEventListener('DOMContentLoaded', () => {
   setMode(savedMode);
   switchView(savedView);
 
-  fetchProfile();   // loads bio, tutorCourses, stats, rooms
+  fetchProfile();
   fetchTutors();
   fetchNotifications();
+  fetchTutorRequests();
+  fetchBroadcastRequests();
 
   let notifInterval = setInterval(fetchNotifications, 60000);
   document.addEventListener('visibilitychange', () => {
@@ -445,7 +475,7 @@ async function fetchProfile() {
     userProfile.bio          = data.bio || '';
     userProfile.tutorCourses = data.tutorCourses || [];
     userProfile.tuteeCourses = data.tuteeCourses || [];
-    availableRooms           = data.rooms || [];
+    availableRooms           = Array.isArray(data.rooms) ? data.rooms : Object.values(data.rooms || {});
 
     updateProfileDisplay();
     populateGroupRoomSelect();
@@ -781,10 +811,10 @@ function switchReqTab(tab) {
 }
 
 async function fetchTutorRequests() {
-  // Short TTL (30s) — tutor needs to see new student requests quickly.
   await cachedJson('tutorRequests', '/api/requests?role=tutor', 30, (data) => {
     pendingRequests = data.requests || [];
     renderTutorRequests();
+    updateTutorDashboardBadge();
   });
 }
 
@@ -852,6 +882,7 @@ async function fetchBroadcastRequests() {
   await cachedJson('broadcastPool', '/api/requests?role=broadcast', 30, (data) => {
     broadcastRequests = data.requests || [];
     renderBroadcastRequests();
+    updateTutorDashboardBadge();
   });
 }
 
@@ -1443,8 +1474,13 @@ let _acceptIsClaim = false;  // true when opened from claimBroadcast
 function populateAcceptRoomSelect() {
   const sel = document.getElementById('acceptRoom');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— auto-assign —</option>' +
-    availableRooms.map(r => `<option value="${r.room_id}">${esc(r.room_name)} (${r.room_type})</option>`).join('');
+
+  const modality = document.getElementById('acceptModality').value;
+
+  const targetType = modality === 'Online' ? 'Virtual' : 'Physical';
+  const filteredRooms = availableRooms.filter(r => r.room_type === targetType);
+
+  sel.innerHTML = '<option value="">— auto-assign —</option>' + filteredRooms.map(r => `<option value="${r.room_id}">${esc(r.room_name)}</option>`).join('');
 }
 
 function openAcceptModal(req) {
@@ -1477,8 +1513,11 @@ function closeAcceptModal() {
 
 function toggleAcceptLink() {
   const modality = document.getElementById('acceptModality').value;
-  document.getElementById('acceptRoomWrap').style.display = modality === 'In-Person' ? 'block' : 'none';
-  document.getElementById('acceptLinkWrap').style.display = modality === 'Online'    ? 'block' : 'none';
+
+  document.getElementById('acceptRoomWrap').style.display = 'block'; 
+  document.getElementById('acceptLinkWrap').style.display = modality === 'Online' ? 'block' : 'none';
+
+  populateAcceptRoomSelect(modality);
 }
 
 async function submitAccept() {
@@ -1972,6 +2011,19 @@ async function loadSessionTopics() {
   }
 }
 
+function updateTutorDashboardBadge() {
+  const badge = document.getElementById('tutorDashboardReqBadge');
+  if (!badge) return;
+  
+  const total = pendingRequests.length + broadcastRequests.length;
+  
+  if (total > 0) {
+    badge.textContent = total > 9 ? '9+' : total;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
 
 // ===== ESC KEY: close any open modal =====
 document.addEventListener('keydown', function (e) {

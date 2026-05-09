@@ -837,9 +837,19 @@ body.mode-tutee #tuteeBtn {
   display: flex;
   flex-direction: column;
   gap: 1rem; 
-  max-height: 60vh;
+  max-height:400px;
   overflow-y: auto;
   padding-right: 0.5rem; 
+  margin-top: 1rem;
+}
+
+.requests-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.requests-list::-webkit-scrollbar-thumb {
+  background: var(--cream-dark);
+  border-radius: 10px;
 }
 
 .request-card { 
