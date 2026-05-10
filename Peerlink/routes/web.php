@@ -30,7 +30,7 @@ Route::redirect('/', '/login');
  */
 Route::middleware(['auth', 'no-cache'])->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->middleware('verified')
+       /* ->middleware('verified') Checks for 2f authentication, uncomment on deployment*/ 
         ->name('dashboard');
 
     Route::get('/profile',    [ProfileController::class, 'edit'])->name('profile.edit');
