@@ -284,13 +284,13 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchTutorRequests();
   fetchBroadcastRequests();
 
-  let notifInterval = setInterval(fetchNotifications, 60000);
+  let notifInterval = setInterval(fetchNotifications, 1000);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       clearInterval(notifInterval);
     } else {
       fetchNotifications();
-      notifInterval = setInterval(fetchNotifications, 60000);
+      notifInterval = setInterval(fetchNotifications, 1000);
     }
   });
 
@@ -637,7 +637,7 @@ function filterTutors() {
   const filtered = allTutors.filter(t => {
     const nameMatch   = !query || t.name.toLowerCase().includes(query);
     const courseMatch = activeDashboardCourses.length === 0 ||
-      activeDashboardCourses.every(c => (t.courses || []).includes(c));
+      activeDashboardCourses.some(c => (t.courses || []).includes(c));
     return nameMatch && courseMatch;
   });
   renderTutors(filtered);
@@ -2087,6 +2087,7 @@ Object.assign(window, {
 
   // Reviews
   openReviewModal, closeReviewModal, submitReview,
+  renderMyRequests, renderSessions,
 
   // My Requests
   cancelRequest, respondToCounter, declineIncomingRequest,

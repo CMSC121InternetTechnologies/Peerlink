@@ -75,7 +75,7 @@ class RequestController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        // Pre-fetch the per-row lookups so RequestResource can render without firing N+1 queries.
+        // Pre-fetch the per-row lookups.
         $counterRoomIds = $requests
             ->where('status', RequestStatus::CounterProposed)
             ->pluck('counter_proposed_room_id')->filter()->unique();
@@ -93,7 +93,7 @@ class RequestController extends Controller
         ]);
     }
 
-    /** POST /api/requests — direct (US_09) or broadcast (US_12) when tutor_id omitted. */
+    /** POST /api/requests — direct when tutor_id omitted. */
     public function store(StoreTutoringRequestRequest $request): JsonResponse
     {
         $user      = $request->user();
@@ -139,11 +139,9 @@ class RequestController extends Controller
         return response()->json(['message' => 'Request submitted.', 'request_id' => $req->request_id], 201);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
     // Lifecycle endpoints — one URL per action, dispatched to the service.
     // Each authorize() call uses RequestPolicy: the controller no longer
     // contains inline `if ($req->student_id !== $user->user_id) return 403`.
-    // ────────────────────────────────────────────────────────────────────────
 
     public function accept(Request $request, string $id): JsonResponse
     {
